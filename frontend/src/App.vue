@@ -102,14 +102,16 @@
         v-if="statusAlerts.length"
         class="fixed top-4 right-4 z-50 w-[320px] max-w-[calc(100vw-2rem)] flex flex-col gap-3"
       >
-        <button
+        <div
           v-for="alert in statusAlerts"
           v-show="isStatusAlertVisible(alert.key)"
           :key="alert.key"
-          type="button"
+          role="button"
+          tabindex="0"
           @click="focusAlertTarget(alert)"
+          @keyup.enter="focusAlertTarget(alert)"
           :class="[
-            'tech-card border rounded-md px-4 py-3 flex items-start gap-3 shadow-lg alert-pulse text-left w-full',
+            'tech-card border rounded-md px-4 py-3 flex items-start gap-3 shadow-lg alert-pulse text-left w-full cursor-pointer',
             alert.level === 'critical'
               ? 'border-red-500/80 text-red-900 dark:text-red-100 alert-critical'
               : 'border-yellow-500/80 text-yellow-900 dark:text-yellow-100 alert-warning'
@@ -124,8 +126,8 @@
             <div class="font-semibold">{{ alert.title }}</div>
             <div class="opacity-90">{{ alert.message }}</div>
           </div>
-          <button
-            class="text-xs opacity-70 hover:opacity-100"
+          <span
+            class="text-xs opacity-70 hover:opacity-100 cursor-pointer"
             @click.stop="hideStatusAlert(alert.key)"
             :title="t('close')"
           >
@@ -133,8 +135,8 @@
               <path d="M18 6L6 18"></path>
               <path d="M6 6l12 12"></path>
             </svg>
-          </button>
-        </button>
+          </span>
+        </div>
       </div>
       <div class="relative z-10">
     <!-- Header -->
