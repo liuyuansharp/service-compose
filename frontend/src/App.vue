@@ -98,6 +98,44 @@
   <div :class="isDark ? 'auth-circuit-dark' : 'auth-circuit-light'" class="absolute inset-0"></div>
   <div class="absolute inset-0 auth-pulse"></div>
       <div :class="isDark ? 'auth-noise-dark' : 'auth-noise-light'" class="absolute inset-0"></div>
+      <div
+        v-if="statusAlerts.length"
+        class="fixed top-4 right-4 z-50 w-[320px] max-w-[calc(100vw-2rem)] flex flex-col gap-3"
+      >
+        <button
+          v-for="alert in statusAlerts"
+          v-show="isStatusAlertVisible(alert.key)"
+          :key="alert.key"
+          type="button"
+          @click="focusAlertTarget(alert)"
+          :class="[
+            'tech-card border rounded-md px-4 py-3 flex items-start gap-3 shadow-lg alert-pulse text-left w-full',
+            alert.level === 'critical'
+              ? 'border-red-500/80 text-red-900 dark:text-red-100 alert-critical'
+              : 'border-yellow-500/80 text-yellow-900 dark:text-yellow-100 alert-warning'
+          ]"
+        >
+          <svg class="h-4 w-4 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          </svg>
+          <div class="text-sm flex-1">
+            <div class="font-semibold">{{ alert.title }}</div>
+            <div class="opacity-90">{{ alert.message }}</div>
+          </div>
+          <button
+            class="text-xs opacity-70 hover:opacity-100"
+            @click.stop="hideStatusAlert(alert.key)"
+            :title="t('close')"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6L6 18"></path>
+              <path d="M6 6l12 12"></path>
+            </svg>
+          </button>
+        </button>
+      </div>
       <div class="relative z-10">
     <!-- Header -->
     <header class="tech-header border-b border-white/10">
@@ -367,7 +405,11 @@
       </div>
 
       <!-- Platform Card -->
-  <div class="tech-card rounded-md p-4 mb-6 border-t-4" :class="platformCardBorderClass">
+  <div
+        id="platform-card"
+        class="tech-card rounded-md p-4 mb-6 border-t-4"
+    :class="[platformCardBorderClass, getHealthBgClass(platformHealth), isFocusedTarget('platform') ? 'service-focus' : '']"
+      >
         <div class="flex justify-between items-start mb-4">
           <div>
             <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('platform') }}</h2>
@@ -478,8 +520,9 @@
           <div
             v-for="service in servicesStatus"
             :key="service.name"
+            :id="serviceCardId(service.name)"
             class="tech-card rounded-md p-4 transition"
-            :class="getServiceBorderClass(service)"
+            :class="[getServiceBorderClass(service), getHealthBgClass(getHealthState(service)), isFocusedTarget(`service:${service.name}`) ? 'service-focus' : '']"
           >
             <div class="flex justify-between items-start mb-4">
               <div>
@@ -1257,6 +1300,9 @@ const translations = {
     dark_mode: '暗色模式',
     light_mode: '亮色模式',
     alert_title: '告警',
+    alert_stopped_title: '服务已停止',
+    alert_abnormal_title: '服务异常',
+    close: '关闭',
     alert_metrics: '资源使用率过高',
     info: '信息',
     loading_info: '正在加载信息...',
@@ -1397,6 +1443,9 @@ const translations = {
     dark_mode: 'Dark mode',
     light_mode: 'Light mode',
     alert_title: 'Alert',
+    alert_stopped_title: 'Service stopped',
+    alert_abnormal_title: 'Service abnormal',
+    close: 'Close',
     alert_metrics: 'High resource usage',
     info: 'Info',
     loading_info: 'Loading info...',
@@ -1728,6 +1777,9 @@ const logSearch = ref('')
 const lastUpdated = ref('')
 const controlling = ref(false)
 const notification = ref(null)
+const statusAlertVisibility = ref({})
+const focusedAlertKey = ref('')
+let focusAlertTimer = null
 const metricsHistory = ref({}) // { service: [points...] }
 const metricsLoading = ref(false)
 const metricsRangeHours = ref(24)
@@ -1737,6 +1789,8 @@ let memoryChart = null
 let diskChart = null
 let metricsResizeHandler = null
 let logsScrollCleanup = null
+const statusAlertTimers = ref({})
+let statusAlertRepeatTimer = null
 
 let statusInterval = null
 let logsInterval = null
@@ -1763,6 +1817,12 @@ const getHealthBorderClass = (health) => {
   if (health === 'running') return 'border-l-4 border-green-500 ring-1 ring-green-300/60'
   if (health === 'abnormal') return 'border-l-4 border-yellow-500 ring-1 ring-yellow-300/60'
   return 'border-l-4 border-slate-300 ring-1 ring-slate-200/70'
+}
+
+const getHealthBgClass = (health) => {
+  if (health === 'running') return 'bg-green-50/70 dark:bg-emerald-950/30'
+  if (health === 'abnormal') return 'bg-yellow-50/70 dark:bg-yellow-900/25'
+  return 'bg-slate-200/70 dark:bg-slate-800/60'
 }
 
 const getHealthTooltip = (item) => {
@@ -1795,6 +1855,65 @@ const platformCardBorderClass = computed(() => {
 const getServiceHealthLabel = (service) => getHealthLabel(getHealthState(service))
 const getServiceHealthTextClass = (service) => getHealthTextClass(getHealthState(service))
 const getServiceBorderClass = (service) => getHealthBorderClass(getHealthState(service))
+
+const statusAlerts = computed(() => {
+  const items = []
+  const platformHealth = getHealthState(platformStatus.value)
+  if (platformStatus.value?.health && platformHealth !== 'running') {
+    items.push({
+      key: 'platform',
+      name: t('platform'),
+      health: platformHealth
+    })
+  }
+  servicesStatus.value.forEach((service) => {
+    const health = getHealthState(service)
+    if (health !== 'running') {
+      items.push({
+        key: `service:${service.name}`,
+        name: service.name,
+        health
+      })
+    }
+  })
+
+  return items
+    .map((item) => {
+    const isStopped = item.health === 'stopped'
+    return {
+      ...item,
+      level: isStopped ? 'critical' : 'warning',
+      title: isStopped ? t('alert_stopped_title') : t('alert_abnormal_title'),
+      message: `${item.name} (${isStopped ? t('stopped') : t('abnormal')})`
+    }
+  })
+    .sort((a, b) => {
+      if (a.level === b.level) return 0
+      return a.level === 'critical' ? -1 : 1
+    })
+})
+
+const serviceCardId = (name) => {
+  return `service-card-${String(name).replace(/[^a-zA-Z0-9_-]/g, '-')}`
+}
+
+const focusAlertTarget = async (alert) => {
+  if (!alert?.key) return
+  focusedAlertKey.value = alert.key
+  if (focusAlertTimer) clearTimeout(focusAlertTimer)
+  focusAlertTimer = setTimeout(() => {
+    focusedAlertKey.value = ''
+  }, 4000)
+
+  await nextTick()
+  const targetId = alert.key === 'platform' ? 'platform-card' : serviceCardId(alert.name)
+  const target = typeof document !== 'undefined' ? document.getElementById(targetId) : null
+  if (target?.scrollIntoView) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+const isFocusedTarget = (key) => focusedAlertKey.value === key
 
 const runningCount = computed(() => {
   return servicesStatus.value.filter(s => getHealthState(s) === 'running').length
@@ -2832,6 +2951,62 @@ const showNotification = (message, type = 'success', details = null) => {
   }, 3000)
 }
 
+const isStatusAlertVisible = (key) => Boolean(statusAlertVisibility.value[key])
+
+const showStatusAlert = (key) => {
+  if (!key) return
+  statusAlertVisibility.value[key] = true
+  if (statusAlertTimers.value[key]) clearTimeout(statusAlertTimers.value[key])
+  statusAlertTimers.value[key] = setTimeout(() => {
+    statusAlertVisibility.value[key] = false
+  }, 5000)
+}
+
+const hideStatusAlert = (key) => {
+  if (!key) return
+  statusAlertVisibility.value[key] = false
+  if (statusAlertTimers.value[key]) clearTimeout(statusAlertTimers.value[key])
+  delete statusAlertTimers.value[key]
+}
+
+const startRepeatAlert = () => {
+  if (statusAlertRepeatTimer) return
+  statusAlertRepeatTimer = setInterval(() => {
+    statusAlerts.value.forEach(alert => {
+      showStatusAlert(alert.key)
+    })
+    if (!statusAlerts.value.length) {
+      stopRepeatAlert()
+    }
+  }, 30000)
+}
+
+const stopRepeatAlert = () => {
+  if (statusAlertRepeatTimer) clearInterval(statusAlertRepeatTimer)
+  statusAlertRepeatTimer = null
+}
+
+watch(
+  () => statusAlerts.value,
+  (alerts) => {
+    const activeKeys = new Set(alerts.map(alert => alert.key))
+    Object.keys(statusAlertTimers.value).forEach((key) => {
+      if (!activeKeys.has(key)) {
+        hideStatusAlert(key)
+      }
+    })
+
+    if (!alerts.length) {
+      stopRepeatAlert()
+      return
+    }
+
+    alerts.forEach(alert => showStatusAlert(alert.key))
+    startRepeatAlert()
+  },
+  { deep: true, immediate: true }
+)
+
 onMounted(() => {
   bootstrapSession()
 })
@@ -2840,6 +3015,11 @@ onUnmounted(() => {
   cleanupRealtime()
   if (logsInterval) clearInterval(logsInterval)
   logsScrollCleanup?.()
+  Object.keys(statusAlertTimers.value).forEach((key) => {
+    if (statusAlertTimers.value[key]) clearTimeout(statusAlertTimers.value[key])
+  })
+  stopRepeatAlert()
+  if (focusAlertTimer) clearTimeout(focusAlertTimer)
 })
 </script>
 
@@ -2959,6 +3139,15 @@ onUnmounted(() => {
   }
   50% {
     opacity: 0.22;
+  }
+}
+
+@keyframes alert-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.2);
   }
 }
 
@@ -3239,6 +3428,70 @@ onUnmounted(() => {
 .tech-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28), 0 18px 36px rgba(15, 23, 42, 0.15);
+}
+
+.alert-critical {
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.95), rgba(254, 202, 202, 0.9));
+}
+
+.dark .alert-critical {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.8), rgba(88, 28, 28, 0.75));
+}
+
+.alert-warning {
+  background: linear-gradient(135deg, rgba(254, 249, 195, 0.95), rgba(254, 240, 138, 0.9));
+}
+
+.dark .alert-warning {
+  background: linear-gradient(135deg, rgba(113, 63, 18, 0.75), rgba(120, 53, 15, 0.7));
+}
+
+.alert-pulse {
+  animation: alert-pulse 4s ease-in-out infinite;
+}
+
+.service-focus {
+  position: relative;
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 12px 26px rgba(15, 23, 42, 0.16);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  animation: service-focus-flip 3.2s ease-in-out infinite;
+}
+
+.service-focus::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -1px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.55), rgba(99, 102, 241, 0.45), rgba(56, 189, 248, 0));
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.service-focus::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.18), transparent 60%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+
+@keyframes service-focus-flip {
+  0%, 100% {
+    transform: perspective(900px) rotateX(0deg) rotateY(0deg);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2), 0 10px 22px rgba(15, 23, 42, 0.12);
+  }
+  50% {
+    transform: perspective(900px) rotateX(4deg) rotateY(-5deg);
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.45), 0 18px 32px rgba(15, 23, 42, 0.22);
+  }
 }
 
 .dark .tech-card {
