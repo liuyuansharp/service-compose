@@ -66,6 +66,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    role = Column(String, default="admin", nullable=False)  # admin / operator / readonly
+    visible_cards = Column(String, default="", nullable=False)  # JSON array string, empty = all
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -91,14 +93,25 @@ LOG_INDEX_CACHE: Dict[str, Dict] = {}
 def init_auth_db():
     AUTH_DB_PATH.parent.mkdir(exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    # Auto-migrate: add role / visible_cards columns if missing
+    import sqlite3
+    conn = sqlite3.connect(str(AUTH_DB_PATH))
+    cursor = conn.cursor()
+    existing = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
+    if "role" not in existing:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'")
+    if "visible_cards" not in existing:
+        cursor.execute("ALTER TABLE users ADD COLUMN visible_cards TEXT NOT NULL DEFAULT ''")
+    conn.commit()
+    conn.close()
     session = SessionLocal()
     try:
         count = session.query(User).count()
         if count == 0:
             default_password = os.getenv('DEFAULT_ADMIN_PASSWORD', 'ly1234')
-            session.add(User(username='liuyuan', password_hash=pwd_context.hash(default_password)))
+            session.add(User(username='liuyuan', password_hash=pwd_context.hash(default_password), role='admin'))
             session.commit()
-            logger.info("Created default liuyuan user 'liuyuan'")
+            logger.info("Created default admin user 'liuyuan'")
     finally:
         session.close()
 
@@ -109,10 +122,19 @@ def get_user_by_username(username: str) -> Optional[Dict]:
         user = session.query(User).filter(User.username == username).first()
         if not user:
             return None
+        # parse visible_cards JSON
+        vc = []
+        if user.visible_cards:
+            try:
+                vc = json.loads(user.visible_cards)
+            except Exception:
+                vc = []
         return {
             "id": user.id,
             "username": user.username,
             "password_hash": user.password_hash,
+            "role": user.role or "admin",
+            "visible_cards": vc,
             "created_at": user.created_at.isoformat() if user.created_at else None
         }
     finally:
@@ -290,6 +312,8 @@ class LoginRequest(BaseModel):
 
 class UserProfile(BaseModel):
     username: str
+    role: str = "admin"
+    visible_cards: List[str] = []
     created_at: Optional[str] = None
 
 
@@ -996,6 +1020,8 @@ async def login(login_data: LoginRequest):
         "token": token,
         "user": {
             "username": user["username"],
+            "role": user.get("role", "admin"),
+            "visible_cards": user.get("visible_cards", []),
             "created_at": user.get("created_at")
         }
     }
@@ -1005,8 +1031,151 @@ async def login(login_data: LoginRequest):
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {
         "username": current_user["username"],
+        "role": current_user.get("role", "admin"),
+        "visible_cards": current_user.get("visible_cards", []),
         "created_at": current_user.get("created_at")
     }
+
+
+# ==================== Role-based Access Helpers ====================
+
+VALID_ROLES = {"admin", "operator", "readonly"}
+
+def require_role(current_user: dict, *allowed_roles: str):
+    """Raise 403 if the user's role is not in allowed_roles."""
+    role = current_user.get("role", "admin")
+    if role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+def require_admin(current_user: dict):
+    require_role(current_user, "admin")
+
+def require_operator(current_user: dict):
+    """Admin and operator can perform write operations."""
+    require_role(current_user, "admin", "operator")
+
+
+# ==================== User Management APIs (admin only) ====================
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "readonly"
+    visible_cards: List[str] = []
+
+class UserUpdateRequest(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    visible_cards: Optional[List[str]] = None
+
+class UserListItem(BaseModel):
+    id: int
+    username: str
+    role: str
+    visible_cards: List[str]
+    created_at: Optional[str] = None
+
+
+@app.get("/api/users")
+async def list_users(current_user: dict = Depends(get_current_user)):
+    """List all users (admin only)."""
+    require_admin(current_user)
+    session = SessionLocal()
+    try:
+        users = session.query(User).order_by(User.id).all()
+        result = []
+        for u in users:
+            vc = []
+            if u.visible_cards:
+                try:
+                    vc = json.loads(u.visible_cards)
+                except Exception:
+                    vc = []
+            result.append({
+                "id": u.id,
+                "username": u.username,
+                "role": u.role or "admin",
+                "visible_cards": vc,
+                "created_at": u.created_at.isoformat() if u.created_at else None
+            })
+        return result
+    finally:
+        session.close()
+
+
+@app.post("/api/users")
+async def create_user(req: UserCreateRequest, current_user: dict = Depends(get_current_user)):
+    """Create a new user (admin only)."""
+    require_admin(current_user)
+    if req.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+    session = SessionLocal()
+    try:
+        existing = session.query(User).filter(User.username == req.username).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already exists")
+        user = User(
+            username=req.username,
+            password_hash=pwd_context.hash(req.password),
+            role=req.role,
+            visible_cards=json.dumps(req.visible_cards) if req.visible_cards else ""
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return {"status": "success", "id": user.id, "username": user.username}
+    finally:
+        session.close()
+
+
+@app.put("/api/users/{user_id}")
+async def update_user(user_id: int, req: UserUpdateRequest, current_user: dict = Depends(get_current_user)):
+    """Update a user (admin only)."""
+    require_admin(current_user)
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if req.role is not None:
+            if req.role not in VALID_ROLES:
+                raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+            # Prevent removing the last admin
+            if user.role == "admin" and req.role != "admin":
+                admin_count = session.query(User).filter(User.role == "admin").count()
+                if admin_count <= 1:
+                    raise HTTPException(status_code=400, detail="Cannot remove the last admin user")
+            user.role = req.role
+        if req.password is not None and req.password.strip():
+            user.password_hash = pwd_context.hash(req.password)
+        if req.visible_cards is not None:
+            user.visible_cards = json.dumps(req.visible_cards) if req.visible_cards else ""
+        session.commit()
+        return {"status": "success"}
+    finally:
+        session.close()
+
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, current_user: dict = Depends(get_current_user)):
+    """Delete a user (admin only). Cannot delete yourself."""
+    require_admin(current_user)
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user.username == current_user["username"]:
+            raise HTTPException(status_code=400, detail="Cannot delete yourself")
+        if user.role == "admin":
+            admin_count = session.query(User).filter(User.role == "admin").count()
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="Cannot delete the last admin user")
+        session.delete(user)
+        session.commit()
+        return {"status": "success"}
+    finally:
+        session.close()
 
 
 # ==================== Service Order (config file) ====================
@@ -1014,6 +1183,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 @app.put("/api/preferences/service-order")
 async def put_service_order(request: Request, current_user: dict = Depends(get_current_user)):
     """按拖拽顺序重排配置文件中 services 列表"""
+    require_operator(current_user)
     body = await request.json()
     order = body.get("order", [])
     if not isinstance(order, list) or not all(isinstance(n, str) for n in order):
@@ -1056,6 +1226,7 @@ async def upload_update_package(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
+    require_operator(current_user)
     if not file.filename or not file.filename.endswith(".tar.gz"):
         raise HTTPException(status_code=400, detail="Only .tar.gz packages are supported")
     upload_dir = SERVICE_DIR / "uploads"
@@ -1105,6 +1276,7 @@ async def rollback_update(
     backup: str = Query(...),
     current_user: dict = Depends(get_current_user)
 ):
+    require_operator(current_user)
     try:
         rollback_to_backup(service, backup)
         return {"status": "success", "message": "rollback completed"}
@@ -1237,7 +1409,8 @@ async def dashboard_sse(request: Request, token: Optional[str] = Query(None)):
 
 @app.post("/api/control")
 async def control_service(control: ServiceControl, current_user: dict = Depends(get_current_user)):
-    """Control service (start/stop/restart)."""
+    """Control service (start/stop/restart). Requires operator or admin role."""
+    require_operator(current_user)
     try:
         logger.info(f"Control action: {control.action}")
         
@@ -1258,6 +1431,10 @@ async def control_service(control: ServiceControl, current_user: dict = Depends(
                 cmd.extend(['--service', control.service])
                 if control.action in ("start", "restart"):
                     cmd.append('--daemon')
+        else:
+            # 全部服务：start/restart 也需要 daemon 以免阻塞
+            if control.action in ("start", "restart"):
+                cmd.append('--daemon')
         
         # Execute command
         if "--daemon" in cmd:
@@ -1626,6 +1803,143 @@ async def websocket_logs(websocket: WebSocket, service: str):
             await websocket.close(code=1000)
         except Exception:
             pass
+
+
+# ==================== WebShell Terminal ====================
+
+import pty
+import struct
+import fcntl
+import termios
+import signal
+
+@app.websocket("/api/ws/terminal")
+async def websocket_terminal(websocket: WebSocket):
+    """WebSocket endpoint for interactive terminal (PTY). Admin only."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+    try:
+        user = decode_token(token)
+        if user.get("role", "admin") != "admin":
+            await websocket.close(code=1008, reason="Admin only")
+            return
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+
+    # 创建 PTY 对
+    master_fd, slave_fd = pty.openpty()
+    shell = os.environ.get("SHELL", "/bin/bash")
+
+    # 用 subprocess 启动 shell，stdin/stdout/stderr 绑定到 slave 端
+    proc = subprocess.Popen(
+        [shell, "--login"],
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        cwd=str(SERVICE_DIR),
+        preexec_fn=os.setsid,
+        close_fds=True,
+    )
+    os.close(slave_fd)  # 父进程不需要 slave 端
+    logger.info(f"Terminal session started, shell PID: {proc.pid}")
+
+    loop = asyncio.get_event_loop()
+
+    async def read_pty():
+        """用 loop.add_reader 事件驱动地从 PTY 读取输出"""
+        try:
+            while True:
+                # 等待 master_fd 可读
+                readable = asyncio.Event()
+                loop.add_reader(master_fd, readable.set)
+                try:
+                    await readable.wait()
+                finally:
+                    loop.remove_reader(master_fd)
+                try:
+                    data = os.read(master_fd, 16384)
+                    if not data:
+                        break
+                    await websocket.send_text(data.decode("utf-8", errors="replace"))
+                except OSError:
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    async def write_pty():
+        """接收 WebSocket 消息并写入 PTY"""
+        try:
+            while True:
+                msg = await websocket.receive()
+                if msg.get("type") == "websocket.disconnect":
+                    break
+                text = msg.get("text")
+                if text is None:
+                    continue
+                # 检查是否是 resize 消息
+                try:
+                    payload = json.loads(text)
+                    if payload.get("type") == "resize":
+                        cols = payload.get("cols", 80)
+                        rows = payload.get("rows", 24)
+                        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                        continue
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                # 普通输入
+                try:
+                    os.write(master_fd, text.encode("utf-8"))
+                except OSError:
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    try:
+        read_task = asyncio.ensure_future(read_pty())
+        write_task = asyncio.ensure_future(write_pty())
+
+        done, pending = await asyncio.wait(
+            [read_task, write_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    except WebSocketDisconnect:
+        logger.info(f"Terminal WebSocket disconnected, shell PID: {proc.pid}")
+    except Exception as e:
+        logger.error(f"Terminal error: {e}")
+    finally:
+        # 清理 reader（以防残留）
+        try:
+            loop.remove_reader(master_fd)
+        except Exception:
+            pass
+        os.close(master_fd)
+        # 终止 shell 进程
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            proc.kill()
+        try:
+            await websocket.close(code=1000)
+        except Exception:
+            pass
+        logger.info(f"Terminal session ended, shell PID: {proc.pid}")
 
 
 # ==================== Main ====================

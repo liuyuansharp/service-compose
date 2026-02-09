@@ -164,7 +164,25 @@
                   </svg>
                 </span>
                 <span>{{ currentUser?.username || t('user') }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full"
+                  :class="userRole === 'admin' ? 'bg-red-500/20 text-red-400 border border-red-400/30' : userRole === 'operator' ? 'bg-blue-500/20 text-blue-400 border border-blue-400/30' : 'bg-gray-500/20 text-gray-400 border border-gray-400/30'"
+                >{{ t('role_' + userRole) }}</span>
               </span>
+              <!-- 用户管理（仅管理员） -->
+              <button
+                v-if="isAdmin"
+                @click="showUserManagement = true; loadUsers()"
+                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
+                :title="t('user_management')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="7" r="3" />
+                  <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                  <path d="M19 8v6" />
+                  <path d="M16 11h6" />
+                </svg>
+                {{ t('user_management') }}
+              </button>
               <button
                 @click="logout()"
                 class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
@@ -187,6 +205,7 @@
             <!-- <p class="text-xs text-gray-600 dark:text-slate-400 mt-2">{{ t('last_updated') }}: {{ formattedTimestamp }}</p> -->
             <div class="mt-2 flex items-center justify-end gap-2">
               <button
+                v-if="isAdmin"
                 @click="showTerminal = true"
                 class="px-3 py-1.5 bg-gray-700 text-white rounded-md hover:bg-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 transition text-sm inline-flex items-center gap-2 glass-button-solid"
                 :title="t('terminal')"
@@ -234,7 +253,7 @@
         </div>
       </div>
       <!-- Status Overview Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div v-if="isCardVisible('overview')" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <!-- Overall Status -->
   <div class="tech-card rounded-md p-4 border-l-4" :class="overallStatusBorder">
           <div class="flex items-center justify-between">
@@ -421,6 +440,7 @@
 
       <!-- Platform Card -->
   <div
+        v-if="isCardVisible('platform')"
         id="platform-card"
         class="tech-card rounded-md p-4 mb-6 border-t-4"
     :class="[platformCardBorderClass, getHealthBgClass(platformHealth), isFocusedTarget('platform') ? 'service-focus' : '']"
@@ -432,7 +452,7 @@
           </div>
           <div class="flex flex-wrap gap-3">
             <button
-              v-if="platformStatus.running"
+              v-if="platformStatus.running && canOperate"
               @click="controlService('stop', 'platform')"
               class="px-3.5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
               :disabled="controlling"
@@ -443,7 +463,7 @@
               {{ t('stop') }}
             </button>
             <button
-              v-else
+              v-else-if="!platformStatus.running && canOperate"
               @click="controlService('start', 'platform')"
               class="px-3.5 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
               :disabled="controlling"
@@ -532,7 +552,7 @@
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
-          <div class="flex items-center gap-2">
+          <div v-if="canOperate" class="flex items-center gap-2">
             <!-- 一键启动所有 -->
             <button
               @click="batchControlAll('start')"
@@ -567,7 +587,7 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
-            v-for="service in servicesStatus"
+            v-for="service in visibleServices"
             :key="service.name"
             :id="serviceCardId(service.name)"
             draggable="true"
@@ -598,7 +618,7 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-if="service.running"
+                  v-if="service.running && canOperate"
                   @click="controlService('stop', service.name)"
                   class="px-2.5 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition inline-flex items-center gap-1.5 glass-button-solid"
                   :disabled="controlling"
@@ -609,7 +629,7 @@
                   {{ t('stop') }}
                 </button>
                 <button
-                  v-else
+                  v-else-if="!service.running && canOperate"
                   @click="controlService('start', service.name)"
                   class="px-2.5 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition inline-flex items-center gap-1.5 glass-button-solid"
                   :disabled="controlling"
@@ -841,6 +861,7 @@
                 <div class="flex items-center justify-between">
                   <p class="text-xs text-gray-500 dark:text-slate-400">{{ t('info_version') }}</p>
                   <button
+                    v-if="canOperate"
                     @click="triggerUpdateUpload"
                     class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
                   >
@@ -849,6 +870,7 @@
                 </div>
                 <p class="text-sm font-mono text-gray-800 dark:text-slate-100 mt-1">{{ serviceInfo.version }}</p>
                 <input
+                  v-if="canOperate"
                   ref="updateFileInput"
                   type="file"
                   class="hidden"
@@ -865,7 +887,7 @@
               <p class="text-xs text-gray-500 dark:text-slate-400 mb-2">{{ t('info_build') }}</p>
               <pre class="text-xs font-mono text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{{ serviceInfo.build_date }}</pre>
             </div>
-            <div class="tech-card rounded-md p-4">
+            <div v-if="canOperate" class="tech-card rounded-md p-4">
               <div class="flex items-center justify-between mb-3">
                 <p class="text-xs text-gray-500 dark:text-slate-400">{{ t('rollback_title') }}</p>
                 <button
@@ -901,7 +923,7 @@
                 </button>
               </div>
             </div>
-            <div v-if="uploadingUpdate || updatingService || updateProgress > 0" class="tech-card rounded-md p-4">
+            <div v-if="canOperate && (uploadingUpdate || updatingService || updateProgress > 0)" class="tech-card rounded-md p-4">
               <div class="flex items-center justify-between text-xs text-gray-500 dark:text-slate-400">
                 <span>{{ t('upload_progress') }}</span>
                 <span class="font-mono">{{ uploadProgress }}%</span>
@@ -1313,6 +1335,220 @@
       </div>
     </div>
 
+    <!-- User Management Modal -->
+    <div
+      v-if="showUserManagement"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="showUserManagement = false"
+    >
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showUserManagement = false"></div>
+      <div class="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="7" r="3" />
+                <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                <path d="M19 8v6" />
+                <path d="M16 11h6" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('user_management') }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('user_management_desc') }}</p>
+            </div>
+          </div>
+          <button @click="showUserManagement = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1">
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <!-- Add User Form -->
+          <div class="mb-6 p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-800/50">
+            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 8v6"/><path d="M16 11h6"/><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4"/></svg>
+              {{ t('add_user') }}
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <input
+                v-model="newUserForm.username"
+                type="text"
+                :placeholder="t('username')"
+                class="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <input
+                v-model="newUserForm.password"
+                type="password"
+                :placeholder="t('password')"
+                class="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <select
+                v-model="newUserForm.role"
+                class="px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="admin">{{ t('role_admin') }}</option>
+                <option value="operator">{{ t('role_operator') }}</option>
+                <option value="readonly">{{ t('role_readonly') }}</option>
+              </select>
+              <button
+                @click="createUser"
+                :disabled="!newUserForm.username || !newUserForm.password"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition inline-flex items-center justify-center gap-1.5"
+              >
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                {{ t('add') }}
+              </button>
+            </div>
+          </div>
+
+          <!-- User Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                  <th class="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('username') }}</th>
+                  <th class="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('role') }}</th>
+                  <th class="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('visible_cards_label') }}</th>
+                  <th class="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('created_at') }}</th>
+                  <th class="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('actions') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="u in userList"
+                  :key="u.id"
+                  class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition"
+                >
+                  <td class="py-3 px-4">
+                    <div class="flex items-center gap-2">
+                      <span class="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-semibold">
+                        {{ u.username.charAt(0).toUpperCase() }}
+                      </span>
+                      <span class="font-medium text-gray-900 dark:text-white">{{ u.username }}</span>
+                      <span v-if="u.username === currentUser?.username" class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-700">{{ t('current_user_tag') }}</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4">
+                    <select
+                      v-if="editingUserId !== u.id"
+                      :value="u.role"
+                      @change="quickUpdateRole(u, $event.target.value)"
+                      :disabled="u.username === currentUser?.username"
+                      class="px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-slate-800 text-xs text-gray-800 dark:text-gray-200 focus:outline-none"
+                      :class="u.username === currentUser?.username ? 'opacity-50 cursor-not-allowed' : ''"
+                    >
+                      <option value="admin">{{ t('role_admin') }}</option>
+                      <option value="operator">{{ t('role_operator') }}</option>
+                      <option value="readonly">{{ t('role_readonly') }}</option>
+                    </select>
+                  </td>
+                  <td class="py-3 px-4">
+                    <button
+                      @click="openVisibleCardsEditor(u)"
+                      class="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                    >
+                      <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                      {{ u.visible_cards.length ? t('visible_cards_custom', { count: u.visible_cards.length }) : t('visible_cards_all') }}
+                    </button>
+                  </td>
+                  <td class="py-3 px-4 text-xs text-gray-500 dark:text-gray-400">{{ u.created_at ? u.created_at.slice(0, 10) : '—' }}</td>
+                  <td class="py-3 px-4 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <button
+                        @click="openResetPassword(u)"
+                        class="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                      >{{ t('reset_password') }}</button>
+                      <button
+                        v-if="u.username !== currentUser?.username"
+                        @click="deleteUser(u)"
+                        class="text-xs text-red-600 dark:text-red-400 hover:underline"
+                      >{{ t('delete') }}</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visible Cards Editor Sub-Modal -->
+    <div
+      v-if="showVisibleCardsEditor"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      @click.self="showVisibleCardsEditor = false"
+    >
+      <div class="absolute inset-0 bg-black/40" @click="showVisibleCardsEditor = false"></div>
+      <div class="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h4 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('visible_cards_title', { user: editingVisibleUser?.username }) }}</h4>
+          <button @click="showVisibleCardsEditor = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-6">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ t('visible_cards_hint') }}</p>
+          <div class="space-y-2.5">
+            <label
+              v-for="card in allCardOptions"
+              :key="card.value"
+              class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer transition"
+            >
+              <input
+                type="checkbox"
+                :checked="editingVisibleCards.includes(card.value)"
+                @change="toggleVisibleCard(card.value)"
+                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ card.label }}</span>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ card.desc }}</p>
+              </div>
+            </label>
+          </div>
+          <div class="mt-5 flex items-center justify-between">
+            <button
+              @click="editingVisibleCards = []"
+              class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            >{{ t('visible_cards_select_all') }}</button>
+            <div class="flex gap-2">
+              <button @click="showVisibleCardsEditor = false" class="px-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800">{{ t('cancel') }}</button>
+              <button @click="saveVisibleCards" class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">{{ t('save') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Sub-Modal -->
+    <div
+      v-if="showResetPassword"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      @click.self="showResetPassword = false"
+    >
+      <div class="absolute inset-0 bg-black/40" @click="showResetPassword = false"></div>
+      <div class="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h4 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('reset_password_title', { user: resetPasswordUser?.username }) }}</h4>
+        </div>
+        <div class="p-6 space-y-4">
+          <input
+            v-model="resetPasswordValue"
+            type="password"
+            :placeholder="t('new_password')"
+            class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          />
+          <div class="flex justify-end gap-2">
+            <button @click="showResetPassword = false" class="px-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800">{{ t('cancel') }}</button>
+            <button @click="doResetPassword" :disabled="!resetPasswordValue" class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-40">{{ t('confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -1351,6 +1587,18 @@ let termFitAddon = null
 let termWs = null
 let termPopoutWindow = null
 
+// ---- User Management ----
+const showUserManagement = ref(false)
+const userList = ref([])
+const newUserForm = reactive({ username: '', password: '', role: 'readonly' })
+const showVisibleCardsEditor = ref(false)
+const editingVisibleUser = ref(null)
+const editingVisibleCards = ref([])
+const editingUserId = ref(null)
+const showResetPassword = ref(false)
+const resetPasswordUser = ref(null)
+const resetPasswordValue = ref('')
+
 const authToken = ref(localStorage.getItem('authToken') || '')
 let storedUser = null
 try {
@@ -1363,6 +1611,9 @@ const loginForm = reactive({ username: '', password: '' })
 const loginError = ref('')
 const loginLoading = ref(false)
 const isAuthenticated = computed(() => Boolean(authToken.value))
+const userRole = computed(() => currentUser.value?.role || 'readonly')
+const isAdmin = computed(() => userRole.value === 'admin')
+const canOperate = computed(() => userRole.value === 'admin' || userRole.value === 'operator')
 const lang = ref(localStorage.getItem('lang') || 'zh')
 const isDark = ref(localStorage.getItem('theme') === 'dark')
 const runtimeConfig = typeof window !== 'undefined' ? (window.APP_CONFIG || {}) : {}
@@ -1552,6 +1803,41 @@ const translations = {
     batch_stop_confirm: '确定要停止所有服务吗？',
     batch_action_success: '批量{action}操作已执行',
     batch_action_failed: '批量{action}操作失败',
+    role_admin: '管理员',
+    role_operator: '操作员',
+    role_readonly: '只读',
+    role: '角色',
+    user_management: '用户管理',
+    user_management_desc: '管理用户角色和可见卡片权限',
+    add_user: '新增用户',
+    add: '添加',
+    actions: '操作',
+    created_at: '创建时间',
+    visible_cards_label: '可见卡片',
+    visible_cards_all: '全部可见',
+    visible_cards_custom: '已选 {count} 项',
+    visible_cards_title: '{user} - 可见卡片配置',
+    visible_cards_hint: '不勾选任何项表示全部可见；勾选后仅显示选中的卡片。',
+    visible_cards_select_all: '全部可见（清空选择）',
+    card_overview: '总体状态',
+    card_overview_desc: '运行状态、活跃服务数、系统指标',
+    card_platform: '平台服务',
+    card_platform_desc: '平台服务卡片及控制',
+    card_service_desc: '{name} 服务卡片',
+    current_user_tag: '当前',
+    reset_password: '重置密码',
+    reset_password_title: '{user} - 重置密码',
+    new_password: '新密码',
+    confirm: '确认',
+    cancel: '取消',
+    save: '保存',
+    delete: '删除',
+    user_created: '用户创建成功',
+    user_updated: '用户更新成功',
+    user_deleted: '用户已删除',
+    password_reset_success: '密码重置成功',
+    delete_user_confirm: '确定要删除用户 {user} 吗？',
+    permission_denied: '权限不足',
   },
   en: {
     login: 'Login',
@@ -1711,6 +1997,41 @@ const translations = {
     batch_stop_confirm: 'Are you sure you want to stop all services?',
     batch_action_success: 'Batch {action} executed successfully',
     batch_action_failed: 'Batch {action} failed',
+    role_admin: 'Admin',
+    role_operator: 'Operator',
+    role_readonly: 'Read-only',
+    role: 'Role',
+    user_management: 'Users',
+    user_management_desc: 'Manage user roles and card visibility',
+    add_user: 'Add User',
+    add: 'Add',
+    actions: 'Actions',
+    created_at: 'Created',
+    visible_cards_label: 'Visible Cards',
+    visible_cards_all: 'All visible',
+    visible_cards_custom: '{count} selected',
+    visible_cards_title: '{user} - Visible Cards',
+    visible_cards_hint: 'Leave all unchecked to show everything; check items to show only selected cards.',
+    visible_cards_select_all: 'Show all (clear selection)',
+    card_overview: 'Overview',
+    card_overview_desc: 'Status, active services, system metrics',
+    card_platform: 'Platform Service',
+    card_platform_desc: 'Platform service card and controls',
+    card_service_desc: '{name} service card',
+    current_user_tag: 'You',
+    reset_password: 'Reset Password',
+    reset_password_title: '{user} - Reset Password',
+    new_password: 'New password',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    save: 'Save',
+    delete: 'Delete',
+    user_created: 'User created',
+    user_updated: 'User updated',
+    user_deleted: 'User deleted',
+    password_reset_success: 'Password reset successfully',
+    delete_user_confirm: 'Are you sure you want to delete user {user}?',
+    permission_denied: 'Permission denied',
   }
 }
 
@@ -1877,6 +2198,10 @@ const authorizedFetch = async (url, options = {}) => {
   if (response.status === 401) {
     handleUnauthorized()
     throw new Error('Unauthorized')
+  }
+  if (response.status === 403) {
+    showNotification(t('permission_denied'), 'error')
+    throw new Error('Permission denied')
   }
   return response
 }
@@ -2405,7 +2730,7 @@ const getServiceBorderClass = (service) => getHealthBorderClass(getHealthState(s
 const statusAlerts = computed(() => {
   const items = []
   const platformHealth = getHealthState(platformStatus.value)
-  if (platformStatus.value?.health && platformHealth !== 'running') {
+  if (platformStatus.value?.health && platformHealth !== 'running' && isCardVisible('platform')) {
     items.push({
       key: 'platform',
       name: t('platform'),
@@ -2414,7 +2739,7 @@ const statusAlerts = computed(() => {
   }
   servicesStatus.value.forEach((service) => {
     const health = getHealthState(service)
-    if (health !== 'running') {
+    if (health !== 'running' && isCardVisible('service:' + service.name)) {
       items.push({
         key: `service:${service.name}`,
         name: service.name,
@@ -2496,6 +2821,161 @@ const batchControlAll = async (action) => {
   }
 }
 
+// ---- Card Visibility ----
+const isCardVisible = (cardKey) => {
+  const vc = currentUser.value?.visible_cards
+  if (!vc || vc.length === 0) return true // empty = all visible
+  return vc.includes(cardKey)
+}
+
+const visibleServices = computed(() => {
+  const vc = currentUser.value?.visible_cards
+  if (!vc || vc.length === 0) return servicesStatus.value
+  return servicesStatus.value.filter(s => vc.includes('service:' + s.name))
+})
+
+const allCardOptions = computed(() => {
+  const opts = [
+    { value: 'overview', label: t('card_overview'), desc: t('card_overview_desc') },
+    { value: 'platform', label: t('card_platform'), desc: t('card_platform_desc') },
+  ]
+  for (const s of servicesStatus.value) {
+    opts.push({ value: 'service:' + s.name, label: s.name, desc: t('card_service_desc', { name: s.name }) })
+  }
+  return opts
+})
+
+// ---- User Management Functions ----
+const loadUsers = async () => {
+  try {
+    const response = await authorizedFetch('/api/users')
+    if (response.ok) {
+      userList.value = await response.json()
+    }
+  } catch (e) {
+    console.error('Load users error:', e)
+  }
+}
+
+const createUser = async () => {
+  try {
+    const response = await authorizedFetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newUserForm)
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    showNotification(t('user_created'), 'success')
+    newUserForm.username = ''
+    newUserForm.password = ''
+    newUserForm.role = 'readonly'
+    await loadUsers()
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
+}
+
+const quickUpdateRole = async (user, newRole) => {
+  try {
+    const response = await authorizedFetch(`/api/users/${user.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole })
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    showNotification(t('user_updated'), 'success')
+    await loadUsers()
+  } catch (e) {
+    showNotification(e.message, 'error')
+    await loadUsers() // revert UI
+  }
+}
+
+const deleteUser = async (user) => {
+  if (!confirm(t('delete_user_confirm', { user: user.username }))) return
+  try {
+    const response = await authorizedFetch(`/api/users/${user.id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    showNotification(t('user_deleted'), 'success')
+    await loadUsers()
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
+}
+
+const openVisibleCardsEditor = (user) => {
+  editingVisibleUser.value = user
+  editingVisibleCards.value = [...(user.visible_cards || [])]
+  showVisibleCardsEditor.value = true
+}
+
+const toggleVisibleCard = (cardValue) => {
+  const idx = editingVisibleCards.value.indexOf(cardValue)
+  if (idx >= 0) {
+    editingVisibleCards.value.splice(idx, 1)
+  } else {
+    editingVisibleCards.value.push(cardValue)
+  }
+}
+
+const saveVisibleCards = async () => {
+  if (!editingVisibleUser.value) return
+  try {
+    const response = await authorizedFetch(`/api/users/${editingVisibleUser.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visible_cards: editingVisibleCards.value })
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    showNotification(t('user_updated'), 'success')
+    showVisibleCardsEditor.value = false
+    await loadUsers()
+    // If editing self, update currentUser
+    if (editingVisibleUser.value.username === currentUser.value?.username) {
+      currentUser.value = { ...currentUser.value, visible_cards: [...editingVisibleCards.value] }
+    }
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
+}
+
+const openResetPassword = (user) => {
+  resetPasswordUser.value = user
+  resetPasswordValue.value = ''
+  showResetPassword.value = true
+}
+
+const doResetPassword = async () => {
+  if (!resetPasswordUser.value || !resetPasswordValue.value) return
+  try {
+    const response = await authorizedFetch(`/api/users/${resetPasswordUser.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: resetPasswordValue.value })
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    showNotification(t('password_reset_success'), 'success')
+    showResetPassword.value = false
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
+}
+
 const formattedTimestamp = computed(() => {
   if (!lastUpdated.value) return '—'
   const d = new Date(lastUpdated.value)
@@ -2546,6 +3026,7 @@ const isMemoryCritical = computed(() => systemMetrics.value.memory_percent >= 90
 const isDiskCritical = computed(() => systemMetrics.value.disk_percent >= 90)
 const cpuCorePercents = computed(() => systemMetrics.value.cpu_percents || [])
 const criticalItems = computed(() => {
+  if (!isCardVisible('overview')) return []
   const items = []
   if (isCpuCritical.value) items.push(t('cpu_usage'))
   if (isMemoryCritical.value) items.push(t('memory_usage'))
