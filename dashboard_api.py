@@ -231,6 +231,7 @@ class ServiceStatus(BaseModel):
     uptime_seconds: Optional[int] = None
     restart_count: int = 0
     last_log: Optional[str] = None
+    scheduled_restart: Optional[Dict] = None  # {enabled, cron, last_restart, next_restart}
 
 
 class PlatformStatus(BaseModel):
@@ -510,7 +511,7 @@ def _check_heartbeat(heartbeat_url: Optional[str]) -> Tuple[bool, Optional[str]]
         return False, "invalid_url"
 
 
-def get_service_status(name: str, pidfile: Path, log_file: Path, heartbeat_url: Optional[str] = None) -> ServiceStatus:
+def get_service_status(name: str, pidfile: Path, log_file: Path, heartbeat_url: Optional[str] = None, scheduled_restart_cfg: Optional[Dict] = None) -> ServiceStatus:
     """Get service status from PID file, log file, and heartbeat."""
     pid = get_pid(pidfile)
     running_pid = pid is not None and is_process_running(pid)
@@ -560,6 +561,16 @@ def get_service_status(name: str, pidfile: Path, log_file: Path, heartbeat_url: 
     except Exception as e:
         logger.debug(f"Failed to read log for {name}: {e}")
     
+    # Build scheduled restart info for frontend
+    sr_info = None
+    if scheduled_restart_cfg:
+        sr_info = {
+            "enabled": scheduled_restart_cfg.get("enabled", False),
+            "cron": scheduled_restart_cfg.get("cron", ""),
+            "last_restart": scheduled_restart_cfg.get("last_restart"),
+            "next_restart": _calc_next_restart(scheduled_restart_cfg) if scheduled_restart_cfg.get("enabled") else None,
+        }
+
     return ServiceStatus(
         name=name,
         running=running,
@@ -568,7 +579,8 @@ def get_service_status(name: str, pidfile: Path, log_file: Path, heartbeat_url: 
         pid=pid if running else None,
         uptime=uptime,
         uptime_seconds=uptime_seconds,
-        last_log=last_log
+        last_log=last_log,
+        scheduled_restart=sr_info,
     )
 
 
@@ -1061,6 +1073,137 @@ def require_operator(current_user: dict):
     require_role(current_user, "admin", "operator")
 
 
+# ==================== Scheduled Restart ====================
+
+def _parse_cron(cron_str: str) -> Optional[Dict]:
+    """Parse simple cron string 'HH:MM' or 'HH:MM@weekdays'.
+    weekdays = comma-separated 0-6 (0=Mon, 6=Sun). Empty = every day.
+    Examples: '03:00', '03:30@0,1,2,3,4', '02:00@0,2,4'
+    """
+    if not cron_str:
+        return None
+    try:
+        parts = cron_str.split('@')
+        time_part = parts[0].strip()
+        h, m = int(time_part.split(':')[0]), int(time_part.split(':')[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            return None
+        weekdays = None  # None means every day
+        if len(parts) > 1 and parts[1].strip():
+            weekdays = [int(d) for d in parts[1].strip().split(',') if d.strip().isdigit()]
+            weekdays = [d for d in weekdays if 0 <= d <= 6]
+            if not weekdays:
+                weekdays = None
+        return {"hour": h, "minute": m, "weekdays": weekdays}
+    except Exception:
+        return None
+
+
+def _calc_next_restart(sr_cfg: Dict) -> Optional[str]:
+    """Calculate next restart ISO timestamp from scheduled_restart config."""
+    if not sr_cfg.get("enabled") or not sr_cfg.get("cron"):
+        return None
+    parsed = _parse_cron(sr_cfg["cron"])
+    if not parsed:
+        return None
+    now = datetime.now()
+    target_today = now.replace(hour=parsed["hour"], minute=parsed["minute"], second=0, microsecond=0)
+    weekdays = parsed.get("weekdays")
+
+    # Search for next matching datetime within the next 8 days
+    for day_offset in range(8):
+        candidate = target_today + timedelta(days=day_offset)
+        if day_offset == 0 and candidate <= now:
+            continue  # already passed today
+        if weekdays is not None and candidate.weekday() not in weekdays:
+            continue
+        return candidate.isoformat()
+    return None
+
+
+def _save_config(config: dict):
+    """Write config back to CONFIG_FILE."""
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write('\n')
+
+
+async def _scheduled_restart_loop():
+    """Background loop: every 30s check if any service needs scheduled restart."""
+    logger.info("Scheduled restart checker started")
+    while True:
+        await asyncio.sleep(30)
+        try:
+            config = load_config()
+            now = datetime.now()
+            changed = False
+
+            # Check platform
+            platform_cfg = config.get("platform", {})
+            sr = platform_cfg.get("scheduled_restart")
+            if sr and sr.get("enabled") and sr.get("cron"):
+                if _should_restart_now(sr, now):
+                    logger.info("Scheduled restart triggered for platform")
+                    _do_scheduled_restart("platform")
+                    sr["last_restart"] = now.isoformat()
+                    changed = True
+
+            # Check services
+            for svc in config.get("services", []):
+                sr = svc.get("scheduled_restart")
+                if sr and sr.get("enabled") and sr.get("cron"):
+                    if _should_restart_now(sr, now):
+                        svc_name = svc.get("name", "unknown")
+                        logger.info(f"Scheduled restart triggered for {svc_name}")
+                        _do_scheduled_restart(svc_name)
+                        sr["last_restart"] = now.isoformat()
+                        changed = True
+
+            if changed:
+                _save_config(config)
+        except Exception as e:
+            logger.error(f"Scheduled restart check error: {e}")
+
+
+def _should_restart_now(sr: Dict, now: datetime) -> bool:
+    """Check if 'now' falls within the scheduled cron window."""
+    parsed = _parse_cron(sr.get("cron", ""))
+    if not parsed:
+        return False
+    # Must match hour and minute (within a 60s window to avoid double-trigger)
+    if now.hour != parsed["hour"] or now.minute != parsed["minute"]:
+        return False
+    weekdays = parsed.get("weekdays")
+    if weekdays is not None and now.weekday() not in weekdays:
+        return False
+    # Prevent double-trigger: check last_restart
+    last = sr.get("last_restart")
+    if last:
+        try:
+            last_dt = datetime.fromisoformat(last)
+            if (now - last_dt).total_seconds() < 120:
+                return False  # restarted less than 2 min ago
+        except Exception:
+            pass
+    return True
+
+
+def _do_scheduled_restart(service_name: str):
+    """Execute a restart via manage_services.py for the given service."""
+    cmd = [sys.executable, str(SERVICE_DIR / 'manage_services.py'), 'restart']
+    if service_name == 'platform':
+        cmd.append('--platform')
+    else:
+        cmd.extend(['--service', service_name])
+    cmd.append('--daemon')
+    try:
+        subprocess.Popen(cmd, cwd=str(SERVICE_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        append_audit_log(user="system", role="system", action="restart", target=service_name, detail="scheduled restart")
+    except Exception as e:
+        logger.error(f"Scheduled restart failed for {service_name}: {e}")
+        append_audit_log(user="system", role="system", action="restart", target=service_name, detail=f"scheduled restart failed: {e}", result="failed")
+
+
 # ==================== Audit Log ====================
 
 import threading
@@ -1290,6 +1433,60 @@ async def put_service_order(request: Request, current_user: dict = Depends(get_c
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== Scheduled Restart API ====================
+
+class ScheduledRestartRequest(BaseModel):
+    service: str  # 'platform' or service name
+    enabled: bool = False
+    cron: str = ""  # 'HH:MM' or 'HH:MM@0,1,2,3,4'
+
+@app.put("/api/scheduled-restart")
+async def set_scheduled_restart(req: ScheduledRestartRequest, current_user: dict = Depends(get_current_user)):
+    """Set or update scheduled restart config for a service. Admin/operator only."""
+    require_operator(current_user)
+    # Validate cron format
+    if req.enabled and req.cron:
+        parsed = _parse_cron(req.cron)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="Invalid cron format. Use 'HH:MM' or 'HH:MM@0,1,2,3,4'")
+    try:
+        config = load_config()
+        sr_data = {"enabled": req.enabled, "cron": req.cron}
+        if req.service == 'platform':
+            if 'platform' not in config:
+                config['platform'] = {}
+            # Preserve existing last_restart
+            old_sr = config['platform'].get('scheduled_restart', {})
+            sr_data["last_restart"] = old_sr.get("last_restart")
+            config['platform']['scheduled_restart'] = sr_data
+        else:
+            found = False
+            for svc in config.get('services', []):
+                if svc.get('name') == req.service:
+                    old_sr = svc.get('scheduled_restart', {})
+                    sr_data["last_restart"] = old_sr.get("last_restart")
+                    svc['scheduled_restart'] = sr_data
+                    found = True
+                    break
+            if not found:
+                raise HTTPException(status_code=404, detail=f"Service '{req.service}' not found")
+        _save_config(config)
+        append_audit_log(
+            user=current_user["username"],
+            role=current_user.get("role", "admin"),
+            action="update_schedule",
+            target=req.service,
+            detail=f"enabled={req.enabled}, cron={req.cron}" if req.enabled else "disabled"
+        )
+        next_restart = _calc_next_restart(sr_data) if req.enabled else None
+        return {"ok": True, "next_restart": next_restart}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to set scheduled restart: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/disks", response_model=List[DiskPartitionInfo])
 async def list_disks(current_user: dict = Depends(get_current_user)):
     return get_disk_partitions()
@@ -1389,6 +1586,11 @@ async def _start_log_maintenance():
 
 
 @app.on_event("startup")
+async def _start_scheduled_restart():
+    asyncio.create_task(_scheduled_restart_loop())
+
+
+@app.on_event("startup")
 async def _init_auth():
     init_auth_db()
 
@@ -1410,8 +1612,10 @@ async def get_status(current_user: dict = Depends(get_current_user)) -> Platform
         # Platform status
         platform_pidfile = LOGS_DIR / 'platform.pid'
         platform_logfile = LOGS_DIR / 'platform.log'
-        platform_heartbeat = (config.get('platform') or {}).get('heartbeat')
-        platform_status = get_service_status('platform', platform_pidfile, platform_logfile, platform_heartbeat)
+        platform_cfg = config.get('platform') or {}
+        platform_heartbeat = platform_cfg.get('heartbeat')
+        platform_status = get_service_status('platform', platform_pidfile, platform_logfile, platform_heartbeat,
+                                             scheduled_restart_cfg=platform_cfg.get('scheduled_restart'))
         
         # Services status
         services_status = []
@@ -1420,7 +1624,8 @@ async def get_status(current_user: dict = Depends(get_current_user)) -> Platform
             pidfile = LOGS_DIR / f"{service_name}.pid"
             logfile = LOGS_DIR / f"{service_name}.log"
             heartbeat = service_cfg.get('heartbeat')
-            services_status.append(get_service_status(service_name, pidfile, logfile, heartbeat))
+            services_status.append(get_service_status(service_name, pidfile, logfile, heartbeat,
+                                                      scheduled_restart_cfg=service_cfg.get('scheduled_restart')))
         
         if platform_status.health == "running":
             overall_status = "running"
@@ -1445,8 +1650,10 @@ async def build_dashboard_status() -> DashboardStatus:
         config = load_config()
         platform_pidfile = LOGS_DIR / 'platform.pid'
         platform_logfile = LOGS_DIR / 'platform.log'
-        platform_heartbeat = (config.get('platform') or {}).get('heartbeat')
-        platform_status = get_service_status('platform', platform_pidfile, platform_logfile, platform_heartbeat)
+        platform_cfg = config.get('platform') or {}
+        platform_heartbeat = platform_cfg.get('heartbeat')
+        platform_status = get_service_status('platform', platform_pidfile, platform_logfile, platform_heartbeat,
+                                             scheduled_restart_cfg=platform_cfg.get('scheduled_restart'))
 
         services_status = []
         for service_cfg in config.get('services', []):
@@ -1454,7 +1661,8 @@ async def build_dashboard_status() -> DashboardStatus:
             pidfile = LOGS_DIR / f"{service_name}.pid"
             logfile = LOGS_DIR / f"{service_name}.log"
             heartbeat = service_cfg.get('heartbeat')
-            services_status.append(get_service_status(service_name, pidfile, logfile, heartbeat))
+            services_status.append(get_service_status(service_name, pidfile, logfile, heartbeat,
+                                                      scheduled_restart_cfg=service_cfg.get('scheduled_restart')))
 
         metrics = get_system_metrics()
         if platform_status.health == "running":

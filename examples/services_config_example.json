@@ -21,7 +21,12 @@
       "log": "service_A.log",
       "pidfile": "service_A.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "scheduled_restart": {
+        "enabled": true,
+        "cron": "03:00@0,1",
+        "last_restart": null
+      }
     },
     {
       "name": "service_B",

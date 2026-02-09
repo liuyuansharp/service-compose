@@ -957,6 +957,80 @@
                 {{ updateStatus }}
               </div>
             </div>
+            <!-- Scheduled Restart Section -->
+            <div v-if="canOperate" class="tech-card rounded-md p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <p class="text-xs font-medium text-gray-700 dark:text-slate-300">{{ t('sched_title') }}</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="schedForm.enabled"
+                    @change="schedForm.enabled = $event.target.checked; if (!schedForm.enabled) saveScheduledRestart()"
+                    class="sr-only peer"
+                  />
+                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div v-if="schedForm.enabled" class="space-y-3">
+                <div class="flex items-center gap-3">
+                  <label class="text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">{{ t('sched_time') }}</label>
+                  <input
+                    type="time"
+                    v-model="schedForm.time"
+                    class="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 dark:text-slate-400 block mb-1.5">{{ t('sched_weekdays') }}</label>
+                  <div class="flex gap-1.5 flex-wrap">
+                    <button
+                      v-for="(dayLabel, dayIdx) in weekdayLabels"
+                      :key="dayIdx"
+                      @click="toggleWeekday(dayIdx)"
+                      class="px-2 py-1 rounded text-[11px] font-medium transition"
+                      :class="schedForm.weekdays.includes(dayIdx)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'"
+                    >{{ dayLabel }}</button>
+                  </div>
+                  <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ t('sched_weekdays_hint') }}</p>
+                </div>
+                <button
+                  @click="saveScheduledRestart"
+                  class="w-full px-3 py-1.5 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition font-medium"
+                >{{ t('sched_save') }}</button>
+                <div v-if="serviceInfo?.scheduled_restart?.next_restart || currentSchedNext" class="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  {{ t('sched_next') }}: {{ formatAuditTime(currentSchedNext || serviceInfo?.scheduled_restart?.next_restart) }}
+                </div>
+                <div v-if="serviceInfo?.scheduled_restart?.last_restart" class="text-[11px] text-gray-400 dark:text-gray-500">
+                  {{ t('sched_last') }}: {{ formatAuditTime(serviceInfo.scheduled_restart.last_restart) }}
+                </div>
+              </div>
+              <div v-else class="text-[11px] text-gray-400 dark:text-gray-500">{{ t('sched_disabled') }}</div>
+            </div>
+            <!-- Scheduled Restart Info (readonly) -->
+            <div v-if="!canOperate && serviceInfo?.scheduled_restart" class="tech-card rounded-md p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <svg viewBox="0 0 24 24" class="h-4 w-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                </svg>
+                <p class="text-xs font-medium text-gray-700 dark:text-slate-300">{{ t('sched_title') }}</p>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full" :class="serviceInfo.scheduled_restart.enabled ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-gray-500/15 text-gray-500'">
+                  {{ serviceInfo.scheduled_restart.enabled ? t('sched_enabled_label') : t('sched_disabled') }}
+                </span>
+              </div>
+              <div v-if="serviceInfo.scheduled_restart.enabled" class="space-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+                <div>{{ t('sched_cron_label') }}: <span class="font-mono">{{ serviceInfo.scheduled_restart.cron }}</span></div>
+                <div v-if="serviceInfo.scheduled_restart.next_restart">{{ t('sched_next') }}: {{ formatAuditTime(serviceInfo.scheduled_restart.next_restart) }}</div>
+                <div v-if="serviceInfo.scheduled_restart.last_restart">{{ t('sched_last') }}: {{ formatAuditTime(serviceInfo.scheduled_restart.last_restart) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2012,6 +2086,19 @@ const translations = {
     role_operator: '操作员',
     role_readonly: '只读',
     role_unknown: '未知',
+    // Scheduled Restart
+    sched_title: '定时重启',
+    sched_time: '重启时间',
+    sched_weekdays: '重启日期',
+    sched_weekdays_hint: '不选则每天执行',
+    sched_save: '保存定时设置',
+    sched_saved: '定时重启设置已保存',
+    sched_next: '下次重启',
+    sched_last: '上次重启',
+    sched_disabled: '未启用定时重启',
+    sched_enabled_label: '已启用',
+    sched_cron_label: '计划',
+    audit_action_update_schedule: '定时设置',
   },
   en: {
     login: 'Login',
@@ -2237,6 +2324,19 @@ const translations = {
     role_operator: 'Operator',
     role_readonly: 'Read-only',
     role_unknown: 'Unknown',
+    // Scheduled Restart
+    sched_title: 'Scheduled Restart',
+    sched_time: 'Restart Time',
+    sched_weekdays: 'Restart Days',
+    sched_weekdays_hint: 'Leave empty for daily',
+    sched_save: 'Save Schedule',
+    sched_saved: 'Scheduled restart saved',
+    sched_next: 'Next Restart',
+    sched_last: 'Last Restart',
+    sched_disabled: 'Scheduled restart not enabled',
+    sched_enabled_label: 'Enabled',
+    sched_cron_label: 'Schedule',
+    audit_action_update_schedule: 'Schedule Update',
   }
 }
 
@@ -2834,6 +2934,10 @@ const backupOptions = ref([])
 const selectedBackup = ref('')
 const rollbackConfirmVisible = ref(false)
 const rollbackPendingBackup = ref('')
+
+// ---- Scheduled Restart ----
+const schedForm = reactive({ enabled: false, time: '03:00', weekdays: [] })
+const currentSchedNext = ref(null)
 const statusFetchedAt = ref(0)
 const statusTicker = ref(0)
 let statusUptimeInterval = null
@@ -3231,8 +3335,46 @@ const auditActionClass = (action) => {
     create_user: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
     update_user: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
     delete_user: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+    update_schedule: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
   }
   return map[action] || 'bg-gray-500/15 text-gray-600 dark:text-gray-400'
+}
+
+// ---- Scheduled Restart Functions ----
+const weekdayLabels = computed(() => {
+  return lang.value === 'zh'
+    ? ['一', '二', '三', '四', '五', '六', '日']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+})
+
+const toggleWeekday = (idx) => {
+  const i = schedForm.weekdays.indexOf(idx)
+  if (i >= 0) schedForm.weekdays.splice(i, 1)
+  else schedForm.weekdays.push(idx)
+}
+
+const saveScheduledRestart = async () => {
+  if (!serviceInfo.value) return
+  const serviceName = serviceInfo.value.name
+  const cron = schedForm.enabled
+    ? schedForm.time + (schedForm.weekdays.length ? '@' + schedForm.weekdays.sort().join(',') : '')
+    : ''
+  try {
+    const response = await authorizedFetch('/api/scheduled-restart', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: serviceName, enabled: schedForm.enabled, cron })
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || 'Failed')
+    }
+    const data = await response.json()
+    currentSchedNext.value = data.next_restart || null
+    showNotification(t('sched_saved'), 'success')
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
 }
 
 const formattedTimestamp = computed(() => {
@@ -3358,6 +3500,13 @@ const loadServiceInfo = async (serviceName) => {
     const response = await authorizedFetch(`/api/info?service=${encodeURIComponent(serviceName)}`)
     if (!response.ok) throw new Error('Failed to load info')
     const data = await response.json()
+    // Merge scheduled_restart from SSE status data
+    const statusData = serviceName === 'platform'
+      ? platformStatus.value
+      : servicesStatus.value.find(s => s.name === serviceName)
+    if (statusData?.scheduled_restart) {
+      data.scheduled_restart = statusData.scheduled_restart
+    }
     serviceInfo.value = data
   } catch (error) {
     serviceInfoError.value = error.message || t('info_failed')
@@ -3374,6 +3523,27 @@ const openServiceInfo = async (serviceName) => {
   backupsLoading.value = true
   backupOptions.value = []
   selectedBackup.value = ''
+  currentSchedNext.value = null
+  // Init schedForm from SSE status data
+  const statusData = serviceName === 'platform'
+    ? platformStatus.value
+    : servicesStatus.value.find(s => s.name === serviceName)
+  const sr = statusData?.scheduled_restart
+  if (sr && sr.enabled) {
+    schedForm.enabled = true
+    const cronParts = (sr.cron || '').split('@')
+    schedForm.time = cronParts[0] || '03:00'
+    if (cronParts.length > 1 && cronParts[1]) {
+      schedForm.weekdays = cronParts[1].split(',').map(Number).filter(d => d >= 0 && d <= 6)
+    } else {
+      schedForm.weekdays = []
+    }
+    currentSchedNext.value = sr.next_restart || null
+  } else {
+    schedForm.enabled = false
+    schedForm.time = '03:00'
+    schedForm.weekdays = []
+  }
   await loadServiceInfo(serviceName)
   await loadBackups(serviceName)
 }
