@@ -2,4 +2,6 @@
 
 source venv/bin/activate
 
-python3 dashboard_api.py --host 0.0.0.0 --port 8080
+nohup sh ./test_example.sh &
+
+nohup python3 dashboard_api.py --host 0.0.0.0 --port 8080 &
