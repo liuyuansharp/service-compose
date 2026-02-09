@@ -1538,6 +1538,204 @@ async def list_disks(current_user: dict = Depends(get_current_user)):
     return get_disk_partitions()
 
 
+# ==================== Process Tree API ====================
+
+def _build_process_tree(pid: int) -> Optional[Dict]:
+    """Build a process tree dict for a PID including all children recursively."""
+    try:
+        proc = psutil.Process(pid)
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+
+    def _proc_info(p: psutil.Process) -> Dict:
+        info = {
+            "pid": p.pid,
+            "ppid": None,
+            "name": "",
+            "cmdline": "",
+            "status": "",
+            "cpu_percent": 0.0,
+            "memory_mb": 0.0,
+            "memory_percent": 0.0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "num_threads": 0,
+            "create_time": None,
+            "children": [],
+        }
+        try:
+            info["ppid"] = p.ppid()
+        except Exception:
+            pass
+        try:
+            info["name"] = p.name()
+        except Exception:
+            pass
+        try:
+            cmdline = p.cmdline()
+            info["cmdline"] = " ".join(cmdline) if cmdline else info["name"]
+        except Exception:
+            info["cmdline"] = info["name"]
+        try:
+            info["status"] = p.status()
+        except Exception:
+            pass
+        try:
+            info["cpu_percent"] = round(p.cpu_percent(interval=None), 2)
+        except Exception:
+            pass
+        try:
+            mem = p.memory_info()
+            info["memory_mb"] = round(mem.rss / (1024 * 1024), 2)
+        except Exception:
+            pass
+        try:
+            info["memory_percent"] = round(p.memory_percent(), 2)
+        except Exception:
+            pass
+        try:
+            io = p.io_counters()
+            info["read_bytes"] = getattr(io, "read_bytes", 0)
+            info["write_bytes"] = getattr(io, "write_bytes", 0)
+        except Exception:
+            pass
+        try:
+            info["num_threads"] = p.num_threads()
+        except Exception:
+            pass
+        try:
+            info["create_time"] = datetime.fromtimestamp(p.create_time()).isoformat()
+        except Exception:
+            pass
+
+        # Recurse into children
+        try:
+            for child in p.children(recursive=False):
+                child_info = _proc_info(child)
+                if child_info:
+                    info["children"].append(child_info)
+        except Exception:
+            pass
+        return info
+
+    # First call cpu_percent to prime it, then gather info
+    try:
+        proc.cpu_percent(interval=None)
+        for c in proc.children(recursive=True):
+            try:
+                c.cpu_percent(interval=None)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    import time
+    time.sleep(0.1)  # brief pause for cpu_percent accuracy
+
+    return _proc_info(proc)
+
+
+@app.get("/api/process-tree")
+async def get_process_tree(
+    service: str = Query(..., description="Service name or 'platform'"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get process tree for a service or platform, including all children with resource usage."""
+    if service == "platform":
+        pid = get_pid(LOGS_DIR / "platform.pid")
+    else:
+        pid = get_pid(LOGS_DIR / f"{service}.pid")
+
+    if not pid:
+        return {"service": service, "pid": None, "tree": None, "flat": []}
+
+    tree = _build_process_tree(pid)
+    if not tree:
+        return {"service": service, "pid": pid, "tree": None, "flat": []}
+
+    # Also provide a flat list for easy rendering
+    flat = []
+    def _flatten(node, depth=0):
+        flat.append({
+            "pid": node["pid"],
+            "ppid": node["ppid"],
+            "depth": depth,
+            "name": node["name"],
+            "cmdline": node["cmdline"],
+            "status": node["status"],
+            "cpu_percent": node["cpu_percent"],
+            "memory_mb": node["memory_mb"],
+            "memory_percent": node["memory_percent"],
+            "read_bytes": node["read_bytes"],
+            "write_bytes": node["write_bytes"],
+            "num_threads": node["num_threads"],
+            "create_time": node["create_time"],
+        })
+        for child in node.get("children", []):
+            _flatten(child, depth + 1)
+    _flatten(tree)
+
+    return {"service": service, "pid": pid, "tree": tree, "flat": flat}
+
+
+@app.post("/api/process-tree/kill")
+async def kill_process(
+    pid: int = Query(..., description="PID to kill"),
+    service: str = Query(..., description="Service name for audit log"),
+    kill_children: bool = Query(False, description="Also kill all children"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Kill a specific process or a process and all its children."""
+    require_operator(current_user)
+    killed = []
+    failed = []
+    try:
+        proc = psutil.Process(pid)
+        targets = [proc]
+        if kill_children:
+            try:
+                targets = proc.children(recursive=True) + [proc]
+            except Exception:
+                pass
+
+        for p in targets:
+            try:
+                p_pid = p.pid
+                p.terminate()
+                killed.append(p_pid)
+            except Exception as e:
+                failed.append({"pid": p.pid, "error": str(e)})
+
+        # Give processes time to terminate, then force kill remaining
+        import time
+        time.sleep(0.5)
+        for p in targets:
+            try:
+                if p.is_running():
+                    p.kill()
+            except Exception:
+                pass
+
+    except psutil.NoSuchProcess:
+        raise HTTPException(status_code=404, detail=f"Process {pid} not found")
+    except psutil.AccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied for PID {pid}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    detail = f"killed={killed}"
+    if failed:
+        detail += f", failed={failed}"
+    append_audit_log(
+        user=current_user["username"],
+        role=current_user.get("role", "admin"),
+        action="kill_pid",
+        target=service,
+        detail=detail,
+    )
+    return {"status": "success", "killed": killed, "failed": failed}
+
+
 @app.get("/api/info", response_model=ServiceInfo)
 async def get_info(service: str = Query("platform"), current_user: dict = Depends(get_current_user)):
     return get_service_info(service)

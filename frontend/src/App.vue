@@ -564,8 +564,20 @@
           </div>
           <div>
             <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">PID</p>
-            <p class="text-base font-mono font-semibold mt-1">
-              {{ platformStatus.pid || '—' }}
+            <p class="text-base font-mono font-semibold mt-1 flex items-center gap-2">
+              <span>{{ platformStatus.pid || '—' }}</span>
+              <button
+                v-if="platformStatus.pid"
+                @click="openPidTree('platform')"
+                class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-1"
+                :title="t('pid_tree')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
+                  <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
+                </svg>
+                {{ t('pid_tree') }}
+              </button>
             </p>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('uptime') }}: {{ platformUptimeDisplay }}</p>
           </div>
@@ -709,7 +721,21 @@
               <div>
                 <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">PID</p>
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-mono dark:text-slate-200">{{ service.pid || '—' }}</p>
+                    <div class="flex items-center gap-2">
+                      <p class="text-xs font-mono dark:text-slate-200">{{ service.pid || '—' }}</p>
+                      <button
+                        v-if="service.pid"
+                        @click="openPidTree(service.name)"
+                        class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-0.5"
+                        :title="t('pid_tree')"
+                      >
+                        <svg viewBox="0 0 24 24" class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
+                          <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
+                        </svg>
+                        {{ t('pid_tree') }}
+                      </button>
+                    </div>
                     <p class="text-[11px] text-gray-500 dark:text-slate-400">{{ t('uptime') }}: {{ getServiceUptimeDisplay(service) }}</p>
                   </div>
               </div>
@@ -1848,6 +1874,159 @@
       </div>
     </div>
 
+    <!-- Process Tree Modal -->
+    <div
+      v-if="showPidTree"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
+      @click.self="showPidTree = false"
+    >
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showPidTree = false"></div>
+      <div class="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="19" r="2.5"/>
+                <path d="M12 7.5v4M12 11.5l-6 5M12 11.5l6 5"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ t('pid_tree_title', { service: pidTreeService }) }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('pid_tree_desc') }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="loadPidTree()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">{{ t('pid_tree_refresh') }}</button>
+            <button @click="showPidTree = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+          <!-- Loading -->
+          <div v-if="pidTreeLoading" class="flex items-center justify-center py-12 text-sm text-gray-400">
+            <svg class="animate-spin h-5 w-5 mr-2 text-blue-500" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"/></svg>
+            {{ t('pid_tree_loading') }}
+          </div>
+          <!-- Empty -->
+          <div v-else-if="!pidTreeData?.flat?.length" class="flex flex-col items-center justify-center py-12 text-sm text-gray-400">
+            <svg viewBox="0 0 24 24" class="h-10 w-10 mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            {{ t('pid_tree_empty') }}
+          </div>
+          <!-- Tree Content -->
+          <div v-else class="space-y-0">
+            <!-- Kill All button -->
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('pid_tree_total', { count: pidTreeData.flat.length }) }}</span>
+              <button
+                v-if="canOperate && pidTreeData.flat.length > 1"
+                @click="killPid(pidTreeData.pid, true)"
+                class="px-2.5 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition inline-flex items-center gap-1.5 glass-button-solid"
+              >
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                {{ t('pid_tree_kill_all') }}
+              </button>
+            </div>
+            <!-- Process nodes -->
+            <div
+              v-for="(proc, idx) in pidTreeData.flat"
+              :key="proc.pid"
+              class="relative"
+            >
+              <!-- Tree connector lines -->
+              <div class="flex items-start">
+                <!-- Indent + connector -->
+                <div class="flex-shrink-0 flex items-center" :style="{ width: (proc.depth * 24) + 'px' }">
+                  <template v-if="proc.depth > 0">
+                    <span
+                      v-for="d in proc.depth"
+                      :key="d"
+                      class="inline-block w-6 h-full"
+                    >
+                      <span v-if="d === proc.depth" class="inline-flex items-center h-full">
+                        <svg class="h-4 w-6 text-gray-300 dark:text-gray-600" viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <path d="M0 0 V8 H24"/>
+                        </svg>
+                      </span>
+                    </span>
+                  </template>
+                </div>
+                <!-- Process Card -->
+                <div :class="[
+                  'flex-1 rounded-lg border p-3 mb-2 transition',
+                  proc.depth === 0
+                    ? 'border-indigo-300/60 dark:border-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/20'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800/50 hover:border-gray-300 dark:hover:border-gray-600'
+                ]">
+                  <!-- Top row: PID badge + name + status + kill button -->
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2 flex-wrap min-w-0">
+                      <span :class="[
+                        'text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold flex-shrink-0',
+                        proc.depth === 0
+                          ? 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-400/30'
+                          : 'bg-gray-500/15 text-gray-600 dark:text-gray-400 border border-gray-300/40 dark:border-gray-600/40'
+                      ]">PID {{ proc.pid }}</span>
+                      <span class="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{{ proc.name }}</span>
+                      <span :class="[
+                        'text-[10px] px-1.5 py-0.5 rounded-full',
+                        proc.status === 'running' || proc.status === 'sleeping'
+                          ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                          : proc.status === 'zombie'
+                          ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                          : 'bg-gray-500/15 text-gray-500'
+                      ]">{{ proc.status }}</span>
+                      <span v-if="proc.depth === 0" class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">{{ t('pid_tree_root') }}</span>
+                    </div>
+                    <button
+                      v-if="canOperate"
+                      @click="killPid(proc.pid, false)"
+                      class="flex-shrink-0 px-2 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] rounded hover:bg-red-500/20 transition border border-red-300/30 dark:border-red-500/20 inline-flex items-center gap-1"
+                    >
+                      <svg viewBox="0 0 24 24" class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                      {{ t('pid_tree_kill') }}
+                    </button>
+                  </div>
+                  <!-- Command line -->
+                  <div class="mt-2">
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">{{ t('pid_tree_cmd') }}</p>
+                    <p class="text-[11px] font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 rounded px-2 py-1 break-all leading-relaxed max-h-16 overflow-y-auto">{{ proc.cmdline || '—' }}</p>
+                  </div>
+                  <!-- Metrics row -->
+                  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                    <span class="text-gray-500 dark:text-gray-400">
+                      CPU <span class="font-mono font-semibold" :class="proc.cpu_percent > 80 ? 'text-red-500' : proc.cpu_percent > 50 ? 'text-amber-500' : 'text-blue-600 dark:text-blue-400'">{{ proc.cpu_percent }}%</span>
+                    </span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      MEM <span class="font-mono font-semibold" :class="proc.memory_percent > 80 ? 'text-red-500' : proc.memory_percent > 50 ? 'text-amber-500' : 'text-purple-600 dark:text-purple-400'">{{ proc.memory_mb }} MB</span>
+                      <span class="text-gray-400 dark:text-gray-500">({{ proc.memory_percent }}%)</span>
+                    </span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ t('pid_tree_read') }} <span class="font-mono text-orange-600 dark:text-orange-400">{{ formatBytes(proc.read_bytes) }}</span>
+                    </span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ t('pid_tree_write') }} <span class="font-mono text-emerald-600 dark:text-emerald-400">{{ formatBytes(proc.write_bytes) }}</span>
+                    </span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ t('pid_tree_threads') }} <span class="font-mono text-gray-700 dark:text-gray-300">{{ proc.num_threads }}</span>
+                    </span>
+                    <span v-if="proc.create_time" class="text-gray-400 dark:text-gray-500">
+                      {{ t('pid_tree_created') }} <span class="font-mono">{{ formatAuditTime(proc.create_time) }}</span>
+                    </span>
+                    <span v-if="proc.create_time" class="text-gray-500 dark:text-gray-400">
+                      {{ t('pid_tree_uptime') }} <span class="font-mono text-cyan-600 dark:text-cyan-400">{{ formatDuration(Math.floor((Date.now() - new Date(proc.create_time).getTime()) / 1000)) }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -2202,6 +2381,28 @@ const translations = {
     range_all: '全部历史',
     trend_no_data: '暂无趋势数据，系统每分钟采集一次',
     trend_points: '共 {count} 个数据点',
+    // Process Tree
+    pid_tree: '进程树',
+    pid_tree_title: '{service} 进程树',
+    pid_tree_desc: '查看父子进程关系及资源消耗',
+    pid_tree_loading: '正在加载进程树...',
+    pid_tree_empty: '未找到进程（服务可能未运行）',
+    pid_tree_root: '根进程',
+    pid_tree_child: '子进程',
+    pid_tree_cmd: '完整命令',
+    pid_tree_threads: '线程数',
+    pid_tree_created: '启动时间',
+    pid_tree_uptime: '运行时长',
+    pid_tree_status: '状态',
+    pid_tree_kill: '终止',
+    pid_tree_kill_all: '终止全部',
+    pid_tree_kill_confirm: '确定终止 PID {pid} 吗？',
+    pid_tree_kill_all_confirm: '确定终止该服务的全部 {count} 个进程吗？此操作不可撤销。',
+    pid_tree_killed: '已终止进程',
+    pid_tree_total: '共 {count} 个进程',
+    pid_tree_read: '读',
+    pid_tree_write: '写',
+    pid_tree_refresh: '刷新',
   },
   en: {
     login: 'Login',
@@ -2452,6 +2653,28 @@ const translations = {
     range_all: 'All History',
     trend_no_data: 'No trend data yet. System samples every minute.',
     trend_points: '{count} data points',
+    // Process Tree
+    pid_tree: 'Process Tree',
+    pid_tree_title: '{service} Process Tree',
+    pid_tree_desc: 'View parent-child process relationships and resource usage',
+    pid_tree_loading: 'Loading process tree...',
+    pid_tree_empty: 'No processes found (service may not be running)',
+    pid_tree_root: 'Root',
+    pid_tree_child: 'Child',
+    pid_tree_cmd: 'Full Command',
+    pid_tree_threads: 'Threads',
+    pid_tree_created: 'Started',
+    pid_tree_uptime: 'Uptime',
+    pid_tree_status: 'Status',
+    pid_tree_kill: 'Kill',
+    pid_tree_kill_all: 'Kill All',
+    pid_tree_kill_confirm: 'Are you sure you want to kill PID {pid}?',
+    pid_tree_kill_all_confirm: 'Are you sure you want to kill all {count} processes? This cannot be undone.',
+    pid_tree_killed: 'Process terminated',
+    pid_tree_total: '{count} processes total',
+    pid_tree_read: 'Read',
+    pid_tree_write: 'Write',
+    pid_tree_refresh: 'Refresh',
   }
 }
 
@@ -3063,6 +3286,12 @@ const trendLoading = ref(false)
 const trendChartRef = ref(null)
 let trendChartInstance = null
 
+// ---- Process Tree ----
+const showPidTree = ref(false)
+const pidTreeService = ref('')
+const pidTreeData = ref(null)  // { service, pid, tree, flat }
+const pidTreeLoading = ref(false)
+
 const statusFetchedAt = ref(0)
 const statusTicker = ref(0)
 let statusUptimeInterval = null
@@ -3608,6 +3837,60 @@ watch(showMetricsTrend, (val) => {
     trendChartInstance = null
   }
 })
+
+// ---- Process Tree functions ----
+async function openPidTree(serviceName) {
+  pidTreeService.value = serviceName
+  showPidTree.value = true
+  pidTreeData.value = null
+  await loadPidTree()
+}
+
+async function loadPidTree() {
+  pidTreeLoading.value = true
+  try {
+    const resp = await authorizedFetch(`/api/process-tree?service=${encodeURIComponent(pidTreeService.value)}`)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    pidTreeData.value = await resp.json()
+  } catch (e) {
+    console.error('Failed to load process tree:', e)
+    pidTreeData.value = { service: pidTreeService.value, pid: null, tree: null, flat: [] }
+  } finally {
+    pidTreeLoading.value = false
+  }
+}
+
+async function killPid(pid, killChildren = false) {
+  const msg = killChildren
+    ? t('pid_tree_kill_all_confirm', { count: pidTreeData.value?.flat?.length || 0 })
+    : t('pid_tree_kill_confirm', { pid })
+  if (!confirm(msg)) return
+
+  try {
+    const resp = await authorizedFetch(
+      `/api/process-tree/kill?pid=${pid}&service=${encodeURIComponent(pidTreeService.value)}&kill_children=${killChildren}`,
+      { method: 'POST' }
+    )
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${resp.status}`)
+    }
+    const result = await resp.json()
+    showNotification(`${t('pid_tree_killed')}: PID ${result.killed.join(', ')}`, 'success')
+    // Refresh tree after kill
+    setTimeout(() => loadPidTree(), 800)
+  } catch (e) {
+    showNotification(e.message, 'error')
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
 
 const formattedTimestamp = computed(() => {
   if (!lastUpdated.value) return '—'
