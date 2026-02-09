@@ -1,6 +1,6 @@
 <template>
   <div :class="['min-h-screen', isDark ? 'dark bg-slate-950 text-slate-100' : 'bg-gray-50 text-gray-900']">
-    <div v-if="!isAuthenticated" :class="['min-h-screen relative overflow-hidden flex items-center justify-center px-6 py-12', isDark ? 'login-shell-dark' : 'login-shell-light']">
+    <div v-if="!isAuthenticated" :class="['min-h-screen relative overflow-hidden flex items-center justify-center px-4 py-8 sm:px-6 sm:py-12', isDark ? 'login-shell-dark' : 'login-shell-light']">
       <div :class="isDark ? 'login-bg-dark' : 'login-bg-light'" class="absolute inset-0"></div>
       <div :class="isDark ? 'login-grid' : 'login-grid-light'" class="absolute inset-0"></div>
       <div :class="isDark ? 'login-scanlines' : 'login-scanlines-light'" class="absolute inset-0"></div>
@@ -10,8 +10,8 @@
       <div class="absolute bottom-0 left-1/4 h-52 w-52 rounded-full blur-3xl login-orb login-orb-3"></div>
   <div :class="['relative w-full max-w-4xl border backdrop-blur-xl rounded-2xl shadow-2xl login-panel', isDark ? 'border-white/10 bg-white/5 dark:bg-slate-900/40' : 'border-slate-200 bg-white/80']">
         <div class="grid md:grid-cols-2 gap-0">
-          <div class="p-8 md:p-10 border-b md:border-b-0 md:border-r border-white/10">
-            <div class="flex items-center justify-between">
+          <div class="p-5 sm:p-8 md:p-10 border-b md:border-b-0 md:border-r border-white/10">
+            <div class="flex items-center justify-between gap-2">
               <div :class="['text-xs uppercase tracking-[0.25em]', isDark ? 'text-blue-200/70' : 'text-slate-500']">{{ t('login_tagline') }}</div>
               <div class="flex items-center gap-2">
                 <button
@@ -49,7 +49,7 @@
               </div>
             </div>
           </div>
-          <div class="p-8 md:p-10">
+          <div class="p-5 sm:p-8 md:p-10">
             <div class="mb-6">
               <p :class="['text-xs uppercase tracking-[0.35em]', isDark ? 'text-blue-100/50' : 'text-slate-400']">{{ t('login') }}</p>
               <h3 :class="['mt-2 text-xl font-semibold', isDark ? 'text-white' : 'text-slate-900']">{{ t('welcome_back') }}</h3>
@@ -100,7 +100,7 @@
       <div :class="isDark ? 'auth-noise-dark' : 'auth-noise-light'" class="absolute inset-0"></div>
       <div
         v-if="statusAlerts.length"
-        class="fixed top-4 right-4 z-50 w-[320px] max-w-[calc(100vw-2rem)] flex flex-col gap-3"
+        class="fixed top-4 right-2 sm:right-4 z-50 w-[280px] sm:w-[320px] max-w-[calc(100vw-1rem)] flex flex-col gap-3"
       >
         <div
           v-for="alert in statusAlerts"
@@ -141,30 +141,30 @@
       <div class="relative z-10">
     <!-- Header -->
     <header class="tech-header border-b border-white/10">
-  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex justify-between items-center">
-          <div>
-            <h1 class="text-2xl font-semibold text-gray-900 dark:text-slate-100 inline-flex items-center gap-3">
+  <div class="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div class="flex-shrink-0">
+            <h1 class="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-slate-100 inline-flex items-center gap-2 sm:gap-3">
               {{ t('dashboard_title') }}
               <span class="tech-live-chip">
                 <span class="tech-live-dot"></span>
                 <span>{{ t('live_label') }}</span>
               </span>
             </h1>
-            <p class="text-sm text-gray-600 dark:text-slate-400 mt-1">{{ t('dashboard_subtitle') }}</p>
+            <p class="text-xs sm:text-sm text-gray-600 dark:text-slate-400 mt-1">{{ t('dashboard_subtitle') }}</p>
           </div>
-          <div class="text-right">
-            <div class="flex items-center justify-end gap-3 text-sm text-gray-600">
+          <div class="w-full sm:w-auto sm:text-right">
+            <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-sm text-gray-600">
               <span class="inline-flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <span class="h-7 w-7 rounded-full border border-cyan-300/60 dark:border-cyan-400/30 bg-white/60 dark:bg-slate-800/60 shadow-[0_0_10px_rgba(34,211,238,0.35)] flex items-center justify-center">
+                <span class="h-7 w-7 rounded-full border border-cyan-300/60 dark:border-cyan-400/30 bg-white/60 dark:bg-slate-800/60 shadow-[0_0_10px_rgba(34,211,238,0.35)] flex items-center justify-center flex-shrink-0">
                   <svg viewBox="0 0 24 24" class="h-4 w-4 text-cyan-600 dark:text-cyan-300" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="8" r="3.5" />
                     <path d="M4 20c1.8-3.6 5-5.4 8-5.4s6.2 1.8 8 5.4" />
                     <path d="M6 8h2M16 8h2" />
                   </svg>
                 </span>
-                <span>{{ currentUser?.username || t('user') }}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded-full"
+                <span class="truncate max-w-[80px] sm:max-w-none">{{ currentUser?.username || t('user') }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
                   :class="userRole === 'admin' ? 'bg-red-500/20 text-red-400 border border-red-400/30' : userRole === 'operator' ? 'bg-blue-500/20 text-blue-400 border border-blue-400/30' : 'bg-gray-500/20 text-gray-400 border border-gray-400/30'"
                 >{{ t('role_' + userRole) }}</span>
               </span>
@@ -172,7 +172,7 @@
               <button
                 v-if="isAdmin"
                 @click="showUserManagement = true; loadUsers()"
-                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
+                class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
                 :title="t('user_management')"
               >
                 <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -181,12 +181,12 @@
                   <path d="M19 8v6" />
                   <path d="M16 11h6" />
                 </svg>
-                {{ t('user_management') }}
+                <span class="hidden sm:inline">{{ t('user_management') }}</span>
               </button>
               <!-- 操作日志 -->
               <button
                 @click="showAuditLog = true; loadAuditLogs()"
-                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
+                class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
                 :title="t('audit_log')"
               >
                 <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -196,29 +196,29 @@
                   <line x1="16" y1="17" x2="8" y2="17" />
                   <polyline points="10 9 9 9 8 9" />
                 </svg>
-                {{ t('audit_log') }}
+                <span class="hidden sm:inline">{{ t('audit_log') }}</span>
               </button>
               <button
                 @click="logout()"
-                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
+                class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
               >
                 {{ t('logout') }}
               </button>
               <button
                 @click="toggleLanguage"
-                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
+                class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
               >
                 {{ langLabel }}
               </button>
               <button
                 @click="toggleTheme"
-                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
+                class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
               >
                 {{ themeLabel }}
               </button>
             </div>
             <!-- <p class="text-xs text-gray-600 dark:text-slate-400 mt-2">{{ t('last_updated') }}: {{ formattedTimestamp }}</p> -->
-            <div class="mt-2 flex items-center justify-end gap-2">
+            <div class="mt-2 flex flex-wrap items-center justify-start sm:justify-end gap-2">
               <button
                 v-if="isAdmin"
                 @click="showTerminal = true"
@@ -249,7 +249,7 @@
     </header>
 
     <!-- Main Content -->
-  <main class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <main class="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       <div class="tech-shell">
         <div class="tech-ornament"></div>
       <div
@@ -268,7 +268,7 @@
         </div>
       </div>
       <!-- Status Overview Cards -->
-  <div v-if="isCardVisible('overview')" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div v-if="isCardVisible('overview')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <!-- Overall Status -->
   <div class="tech-card rounded-md p-4 border-l-4" :class="overallStatusBorder">
           <div class="flex items-center justify-between">
@@ -330,7 +330,7 @@
       </div>
 
       <!-- System Metrics Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <!-- CPU Monitor -->
   <div class="tech-card rounded-md p-4 border-t-4 border-blue-500">
           <div class="flex items-center justify-between mb-4">
@@ -475,19 +475,19 @@
         class="tech-card rounded-md p-4 mb-6 border-t-4"
     :class="[platformCardBorderClass, getHealthBgClass(platformHealth), isFocusedTarget('platform') ? 'service-focus' : '']"
       >
-        <div class="flex justify-between items-start mb-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4 mb-4">
           <div>
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('platform') }}</h2>
+            <h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('platform') }}</h2>
             <p class="text-xs text-gray-600 dark:text-slate-400 mt-1">{{ t('platform_service') }}</p>
           </div>
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-2 sm:gap-3">
             <button
               v-if="platformStatus.running && canOperate"
               @click="controlService('stop', 'platform')"
-              class="px-3.5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
               :disabled="controlling"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
               {{ t('stop') }}
@@ -495,19 +495,19 @@
             <button
               v-else-if="!platformStatus.running && canOperate"
               @click="controlService('start', 'platform')"
-              class="px-3.5 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
               :disabled="controlling"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M8 6l10 6-10 6z" />
               </svg>
               {{ t('start') }}
             </button>
             <button
               @click="openServiceInfo('platform')"
-              class="px-3.5 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 10v6" />
                 <path d="M12 7h.01" />
@@ -516,9 +516,9 @@
             </button>
             <button
               @click="openMetrics('platform')"
-              class="px-3.5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 18V6" />
                 <path d="M4 18h16" />
                 <path d="M7 14l4-4 3 3 5-6" />
@@ -527,9 +527,9 @@
             </button>
             <button
               @click="loadLogs('platform')"
-              class="px-3.5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M7 4h7l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
                 <path d="M9 12h6" />
                 <path d="M9 16h6" />
@@ -539,9 +539,9 @@
             <button
               v-if="platformLinkUrl"
               @click="openPlatformLink"
-              class="px-3.5 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition text-sm inline-flex items-center gap-2.5 glass-button-solid"
+              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
             >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10 14a4 4 0 0 1 0-6l2-2a4 4 0 0 1 6 6l-1.5 1.5" />
                 <path d="M14 10a4 4 0 0 1 0 6l-2 2a4 4 0 0 1-6-6L7.5 10" />
               </svg>
@@ -550,7 +550,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">{{ t('status') }}</p>
             <p class="text-base font-semibold mt-1 flex items-center gap-2" :class="platformHealthTextClass">
@@ -569,7 +569,7 @@
             </p>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('uptime') }}: {{ platformUptimeDisplay }}</p>
           </div>
-          <div class="md:col-span-2">
+          <div class="sm:col-span-2">
             <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">{{ t('last_log') }}</p>
             <p class="text-xs font-mono mt-1 text-gray-800 dark:text-slate-200 truncate">
               {{ platformStatus.last_log || t('no_logs_yet') }}
@@ -615,7 +615,7 @@
             </button>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div
             v-for="service in visibleServices"
             :key="service.name"
@@ -626,7 +626,7 @@
             @dragover="onDragOver($event, service.name)"
             @dragleave="onDragLeave($event, service.name)"
             @drop="onDrop($event, service.name)"
-            class="tech-card rounded-md p-4 transition service-draggable"
+            class="tech-card rounded-md p-3 sm:p-4 transition service-draggable"
             :class="[
               getServiceBorderClass(service),
               getHealthBgClass(getHealthState(service)),
@@ -729,13 +729,13 @@
     <!-- CPU Core Details Modal -->
     <div
       v-if="cpuCoresVisible"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="closeCpuCores"
     >
-  <div class="tech-card rounded-md w-full max-w-3xl max-h-[85vh] flex flex-col">
-        <div class="flex justify-between items-center p-5 border-b border-gray-200 dark:border-slate-800">
+  <div class="tech-card rounded-md w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
           <div>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('cpu_cores') }}</h3>
+            <h3 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('cpu_cores') }}</h3>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('core_usage') }}</p>
           </div>
           <button
@@ -780,13 +780,13 @@
     <!-- Disk Details Modal -->
     <div
       v-if="diskDetailsVisible"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="closeDiskDetails"
     >
-  <div class="tech-card rounded-md w-full max-w-5xl max-h-[85vh] flex flex-col">
-        <div class="flex justify-between items-center p-5 border-b border-gray-200 dark:border-slate-800">
+  <div class="tech-card rounded-md w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
           <div>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('disk_details') }}</h3>
+            <h3 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('disk_details') }}</h3>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('disk_details_subtitle') }}</p>
           </div>
           <button
@@ -796,7 +796,7 @@
             ✕
           </button>
         </div>
-        <div class="flex-1 overflow-y-auto p-5 bg-gray-50 dark:bg-slate-950">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-5 bg-gray-50 dark:bg-slate-950">
           <div v-if="diskLoading" class="text-sm text-gray-500 dark:text-slate-400">
             {{ t('loading_disks') }}
           </div>
@@ -807,7 +807,7 @@
             {{ t('no_disk_data') }}
           </div>
           <div v-else class="space-y-3">
-            <div class="grid grid-cols-12 text-xs text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+            <div class="hidden sm:grid grid-cols-12 text-xs text-gray-500 dark:text-slate-400 uppercase tracking-wider">
               <div class="col-span-3">{{ t('disk_device') }}</div>
               <div class="col-span-3">{{ t('disk_mount') }}</div>
               <div class="col-span-2">{{ t('disk_type') }}</div>
@@ -817,33 +817,55 @@
             <div
               v-for="(disk, idx) in diskDetails"
               :key="`${disk.device}-${disk.mountpoint}-${idx}`"
-              class="grid grid-cols-12 items-center gap-3 text-sm tech-card rounded-md p-3"
+              class="text-sm tech-card rounded-md p-3"
             >
-              <div class="col-span-3 font-mono text-gray-700 dark:text-slate-200 truncate" :title="disk.device">
-                {{ disk.device || '—' }}
-              </div>
-              <div class="col-span-3 font-mono text-gray-600 dark:text-slate-300 truncate" :title="disk.mountpoint">
-                {{ disk.mountpoint || '—' }}
-              </div>
-              <div class="col-span-2 text-gray-600 dark:text-slate-300">
-                {{ disk.fstype || '—' }}
-              </div>
-              <div class="col-span-2 text-right font-mono text-gray-700 dark:text-slate-200">
-                {{ disk.total_gb }} GB
-              </div>
-              <div class="col-span-2 text-right">
-                <div class="text-xs font-mono text-gray-700 dark:text-slate-200">
-                  {{ disk.used_gb }} / {{ disk.total_gb }} GB
+              <!-- Desktop: grid layout -->
+              <div class="hidden sm:grid grid-cols-12 items-center gap-3">
+                <div class="col-span-3 font-mono text-gray-700 dark:text-slate-200 truncate" :title="disk.device">
+                  {{ disk.device || '—' }}
                 </div>
-                <div class="mt-1 h-2 rounded-full bg-gray-200 dark:bg-slate-800 overflow-hidden">
+                <div class="col-span-3 font-mono text-gray-600 dark:text-slate-300 truncate" :title="disk.mountpoint">
+                  {{ disk.mountpoint || '—' }}
+                </div>
+                <div class="col-span-2 text-gray-600 dark:text-slate-300">
+                  {{ disk.fstype || '—' }}
+                </div>
+                <div class="col-span-2 text-right font-mono text-gray-700 dark:text-slate-200">
+                  {{ disk.total_gb }} GB
+                </div>
+                <div class="col-span-2 text-right">
+                  <div class="text-xs font-mono text-gray-700 dark:text-slate-200">
+                    {{ disk.used_gb }} / {{ disk.total_gb }} GB
+                  </div>
+                  <div class="mt-1 h-2 rounded-full bg-gray-200 dark:bg-slate-800 overflow-hidden">
+                    <div
+                      class="h-full rounded-full"
+                      :class="disk.percent >= 90 ? 'bg-red-500' : disk.percent >= 80 ? 'bg-amber-500' : 'bg-blue-500'"
+                      :style="{ width: `${Math.min(disk.percent, 100)}%` }"
+                    ></div>
+                  </div>
+                  <div class="mt-1 text-xs font-mono text-gray-500 dark:text-slate-400 text-right">
+                    {{ Number(disk.percent).toFixed(0) }}%
+                  </div>
+                </div>
+              </div>
+              <!-- Mobile: stacked layout -->
+              <div class="sm:hidden space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono text-xs text-gray-700 dark:text-slate-200 truncate flex-1" :title="disk.device">{{ disk.device || '—' }}</span>
+                  <span class="text-xs font-mono text-gray-500 dark:text-slate-400 ml-2">{{ disk.fstype || '—' }}</span>
+                </div>
+                <div class="text-xs font-mono text-gray-600 dark:text-slate-300 truncate" :title="disk.mountpoint">{{ disk.mountpoint || '—' }}</div>
+                <div class="flex items-center justify-between text-xs font-mono text-gray-700 dark:text-slate-200">
+                  <span>{{ disk.used_gb }} / {{ disk.total_gb }} GB</span>
+                  <span class="font-semibold" :class="disk.percent >= 90 ? 'text-red-500' : disk.percent >= 80 ? 'text-amber-500' : 'text-blue-500'">{{ Number(disk.percent).toFixed(0) }}%</span>
+                </div>
+                <div class="h-2 rounded-full bg-gray-200 dark:bg-slate-800 overflow-hidden">
                   <div
                     class="h-full rounded-full"
                     :class="disk.percent >= 90 ? 'bg-red-500' : disk.percent >= 80 ? 'bg-amber-500' : 'bg-blue-500'"
                     :style="{ width: `${Math.min(disk.percent, 100)}%` }"
                   ></div>
-                </div>
-                <div class="mt-1 text-xs font-mono text-gray-500 dark:text-slate-400 text-right">
-                  {{ Number(disk.percent).toFixed(0) }}%
                 </div>
               </div>
             </div>
@@ -855,13 +877,13 @@
     <!-- Service Info Modal -->
     <div
       v-if="serviceInfoVisible"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="closeServiceInfo"
     >
-  <div class="tech-card rounded-md w-full max-w-3xl max-h-[85vh] flex flex-col">
-        <div class="flex justify-between items-center p-5 border-b border-gray-200 dark:border-slate-800">
+  <div class="tech-card rounded-md w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
           <div>
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('info') }}</h3>
+            <h3 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('info') }}</h3>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ serviceInfo?.name || '—' }}</p>
           </div>
           <button
@@ -1054,7 +1076,7 @@
     <!-- Rollback Confirm Modal -->
     <div
       v-if="rollbackConfirmVisible"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="cancelRollback"
     >
   <div class="tech-card rounded-md border border-red-200 dark:border-red-500/40 w-full max-w-md shadow-xl">
@@ -1095,12 +1117,12 @@
     <!-- Metrics Viewer Modal -->
     <div
       v-if="metricsService"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="closeMetrics"
     >
-  <div class="tech-card rounded-md w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div class="flex flex-wrap justify-between items-center gap-3 p-5 border-b border-gray-200 dark:border-slate-800">
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">
+  <div class="tech-card rounded-md w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col">
+        <div class="flex flex-wrap justify-between items-center gap-3 p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
+          <h3 class="text-base sm:text-xl font-semibold text-gray-900 dark:text-slate-100">
             {{ t('metrics') }} - {{ metricsService }} ({{ t('history') }})
           </h3>
           <div class="flex items-center gap-2">
@@ -1130,7 +1152,7 @@
           </div>
         </div>
 
-  <div class="flex-1 overflow-y-auto p-5 bg-gray-50 dark:bg-slate-950">
+  <div class="flex-1 overflow-y-auto p-4 sm:p-5 bg-gray-50 dark:bg-slate-950">
           <div class="relative">
             <div
               v-if="metricsLoading"
@@ -1138,7 +1160,7 @@
             >
               {{ t('loading_metrics') }}
             </div>
-            <div :class="['grid grid-cols-1 gap-6', metricsLoading ? 'opacity-50 pointer-events-none' : '']">
+            <div :class="['grid grid-cols-1 gap-4 sm:gap-6', metricsLoading ? 'opacity-50 pointer-events-none' : '']">
               <div class="tech-card rounded-md p-4">
                 <div class="flex justify-between items-center mb-2">
                   <h4 class="font-semibold text-gray-800 dark:text-slate-100">CPU (%)</h4>
@@ -1196,13 +1218,13 @@
     <!-- Log Viewer Modal -->
     <div
       v-if="selectedService"
-      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="selectedService = null"
     >
-  <div class="tech-card rounded-md w-full max-w-4xl max-h-[90vh] flex flex-col">
+  <div class="tech-card rounded-md w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col">
         <!-- Modal Header -->
-        <div class="flex justify-between items-center p-5 border-b border-gray-200 dark:border-slate-800">
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">
+        <div class="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
+          <h3 class="text-base sm:text-xl font-semibold text-gray-900 dark:text-slate-100">
             {{ t('logs') }} - {{ selectedService }}
           </h3>
           <button
@@ -1214,33 +1236,33 @@
         </div>
 
         <!-- Modal Controls -->
-  <div class="flex flex-wrap gap-3 p-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
+  <div class="flex flex-wrap gap-2 sm:gap-3 p-3 sm:p-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
            <button
              @click="() => { rememberCurrentPosition(); goToTop() }"
-             class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
+             class="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs sm:text-sm"
            >
              {{ t('top') }}
            </button>
            <button
              @click="() => { rememberCurrentPosition(); goToBottom() }"
-             class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
+             class="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs sm:text-sm"
            >
              {{ t('bottom') }}
            </button>
           <button
             @click="togglePause"
-            class="px-4 py-2 rounded-md text-sm font-medium transition"
+            class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition"
             :class="logPaused ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'"
           >
             {{ logPaused ? t('resume') : t('pause') }}
           </button>
 
-          <div class="flex-1 flex gap-2 items-center">
+          <div class="w-full sm:w-auto sm:flex-1 flex gap-2 items-center order-last sm:order-none">
             <input
               v-model="logSearch"
               type="text"
               :placeholder="`${t('search_logs')}...`"
-              class="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="flex-1 min-w-0 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
             <button
               @click="jumpToPrevMatch"
@@ -1258,14 +1280,14 @@
 
           <button
             @click="downloadLogs"
-            class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm"
+            class="px-2 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-xs sm:text-sm"
           >
             {{ t('download') }}
           </button>
 
           <button
             @click="clearLogs"
-            class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-sm"
+            class="px-2 sm:px-4 py-1.5 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs sm:text-sm"
           >
             {{ t('clear') }}
           </button>
@@ -1274,8 +1296,8 @@
         <!-- Modal Body - Logs Display -->
         <div
           ref="logsContainer"
-          class="flex-1 overflow-y-auto p-4 bg-black font-mono text-sm"
-          style="max-height: calc(90vh - 280px)"
+          class="flex-1 overflow-y-auto p-3 sm:p-4 bg-black font-mono text-xs sm:text-sm"
+          style="max-height: calc(92vh - 280px)"
         >
           <div v-if="logsLoading[selectedService]" class="text-gray-400 text-center py-8">
             {{ t('loading_logs') }}...
@@ -1310,7 +1332,7 @@
         </div>
 
         <!-- Modal Footer -->
-  <div class="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-xs text-gray-600 dark:text-slate-300">
+  <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-[10px] sm:text-xs text-gray-600 dark:text-slate-300">
           {{ t('showing_logs', { count: displayedLogs.length }) }}
           <span v-if="logSearch">
             ({{ t('filtered_by') }}: "{{ logSearch }}")
@@ -1366,7 +1388,7 @@
     <div
       v-show="showTerminal && terminalMode !== 'minimized'"
       class="fixed z-50"
-      :class="terminalMode === 'maximized' ? 'inset-0' : 'inset-0 flex items-center justify-center p-4'"
+      :class="terminalMode === 'maximized' ? 'inset-0' : 'inset-0 flex items-center justify-center p-2 sm:p-4'"
       @click.self="terminalMode === 'normal' ? (terminalMode = 'minimized') : null"
     >
       <!-- 背景遮罩（仅 normal 模式） -->
@@ -1376,7 +1398,7 @@
         class="relative flex flex-col bg-[#1e1e1e] border border-gray-700 shadow-2xl overflow-hidden"
         :class="terminalMode === 'maximized'
           ? 'w-full h-full'
-          : 'rounded-lg w-full max-w-5xl h-[75vh]'"
+          : 'rounded-lg w-full max-w-5xl h-[85vh] sm:h-[75vh]'"
       >
         <!-- Terminal Title Bar -->
         <div class="flex justify-between items-center px-3 py-1.5 bg-[#2d2d2d] border-b border-gray-700 select-none flex-shrink-0">
@@ -1442,11 +1464,11 @@
     <!-- User Management Modal -->
     <div
       v-if="showUserManagement"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="showUserManagement = false"
     >
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showUserManagement = false"></div>
-      <div class="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div class="flex items-center gap-3">
@@ -1468,14 +1490,14 @@
           </button>
         </div>
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <!-- Add User Form -->
-          <div class="mb-6 p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-800/50">
+          <div class="mb-6 p-3 sm:p-4 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-800/50">
             <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 8v6"/><path d="M16 11h6"/><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4"/></svg>
               {{ t('add_user') }}
             </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-3">
               <input
                 v-model="newUserForm.username"
                 type="text"
@@ -1508,8 +1530,8 @@
           </div>
 
           <!-- User Table -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+          <div class="overflow-x-auto -mx-4 sm:mx-0">
+            <table class="w-full text-sm min-w-[600px] sm:min-w-0">
               <thead>
                 <tr class="border-b border-gray-200 dark:border-gray-700">
                   <th class="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-400">{{ t('username') }}</th>
@@ -1582,7 +1604,7 @@
     <!-- Visible Cards Editor Sub-Modal -->
     <div
       v-if="showVisibleCardsEditor"
-      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4"
       @click.self="showVisibleCardsEditor = false"
     >
       <div class="absolute inset-0 bg-black/40" @click="showVisibleCardsEditor = false"></div>
@@ -1630,7 +1652,7 @@
     <!-- Reset Password Sub-Modal -->
     <div
       v-if="showResetPassword"
-      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4"
       @click.self="showResetPassword = false"
     >
       <div class="absolute inset-0 bg-black/40" @click="showResetPassword = false"></div>
@@ -1656,11 +1678,11 @@
     <!-- Audit Log Modal -->
     <div
       v-if="showAuditLog"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="showAuditLog = false"
     >
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showAuditLog = false"></div>
-      <div class="relative w-full max-w-5xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-5xl max-h-[92vh] sm:max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div class="flex items-center gap-3">
@@ -1685,7 +1707,7 @@
           </div>
         </div>
         <!-- Filter Bar -->
-        <div class="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 flex-shrink-0">
+        <div class="px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2 sm:gap-3 flex-shrink-0">
           <select
             v-model="auditFilter.action"
             class="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-xs text-gray-800 dark:text-gray-200 focus:outline-none"
@@ -1705,8 +1727,8 @@
           <span v-if="!isAdmin" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ t('audit_own_only') }}</span>
         </div>
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto">
-          <table class="w-full text-sm">
+        <div class="flex-1 overflow-y-auto overflow-x-auto">
+          <table class="w-full text-sm min-w-[700px]">
             <thead class="sticky top-0 bg-gray-50 dark:bg-slate-800/80 backdrop-blur-sm z-10">
               <tr class="border-b border-gray-200 dark:border-gray-700">
                 <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_time') }}</th>
@@ -1756,7 +1778,7 @@
           </table>
         </div>
         <!-- Pagination -->
-        <div v-if="auditTotal > auditLimit" class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+        <div v-if="auditTotal > auditLimit" class="px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
           <button
             @click="auditOffset = Math.max(0, auditOffset - auditLimit); loadAuditLogs()"
             :disabled="auditOffset <= 0"
@@ -1775,11 +1797,11 @@
     <!-- System Metrics Trend Modal -->
     <div
       v-if="showMetricsTrend"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="showMetricsTrend = false"
     >
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showMetricsTrend = false"></div>
-      <div class="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+      <div class="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div class="flex items-center gap-3">
@@ -1810,14 +1832,14 @@
           >{{ r.label }}</button>
         </div>
         <!-- Chart Area -->
-        <div class="flex-1 p-6 min-h-0">
+        <div class="flex-1 p-4 sm:p-6 min-h-0">
           <div v-if="trendLoading" class="h-full flex items-center justify-center text-sm text-gray-400">
             {{ t('loading_info') }}
           </div>
           <div v-else-if="trendData.length === 0" class="h-full flex items-center justify-center text-sm text-gray-400">
             {{ t('trend_no_data') }}
           </div>
-          <div v-else ref="trendChartRef" class="w-full" style="height: 380px;"></div>
+          <div v-else ref="trendChartRef" class="w-full" style="height: min(380px, 50vh);"></div>
         </div>
         <!-- Footer info -->
         <div class="px-6 py-2 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0">
@@ -5390,5 +5412,42 @@ onUnmounted(() => {
 .term-win-btn:hover {
   background: rgba(255,255,255,0.1);
   color: #e5e7eb;
+}
+
+/* ---- 手机端适配 ---- */
+@media (max-width: 640px) {
+  /* 确保所有弹窗内容不溢出 */
+  .tech-card {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* 减小圆环图尺寸 */
+  .tech-card .w-16.h-16 {
+    width: 3rem !important;
+    height: 3rem !important;
+  }
+  .tech-card .w-16.h-16 .w-12.h-12 {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+  }
+
+  /* 日志行号列窄一些 */
+  .font-mono.text-gray-500.mr-2.select-none {
+    width: 2.5rem !important;
+    font-size: 10px !important;
+  }
+
+  /* 触摸友好的最小点击区域 */
+  button {
+    min-height: 32px;
+  }
+
+  /* 优化toast通知在手机上的位置 */
+  .fixed.bottom-4.right-4 {
+    left: 1rem !important;
+    right: 1rem !important;
+    bottom: 1rem !important;
+  }
 }
 </style>
