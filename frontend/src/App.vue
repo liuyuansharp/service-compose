@@ -185,16 +185,29 @@
               </button>
             </div>
             <!-- <p class="text-xs text-gray-600 dark:text-slate-400 mt-2">{{ t('last_updated') }}: {{ formattedTimestamp }}</p> -->
-            <button
-              @click="refreshStatus"
-              class="mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm inline-flex items-center gap-2 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                <path d="M20 4v6h-6" />
-              </svg>
-              {{ t('refresh') }}
-            </button>
+            <div class="mt-2 flex items-center justify-end gap-2">
+              <button
+                @click="showTerminal = true"
+                class="px-3 py-1.5 bg-gray-700 text-white rounded-md hover:bg-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 transition text-sm inline-flex items-center gap-2 glass-button-solid"
+                :title="t('terminal')"
+              >
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="4 17 10 11 4 5" />
+                  <line x1="12" y1="19" x2="20" y2="19" />
+                </svg>
+                {{ t('terminal') }}
+              </button>
+              <button
+                @click="refreshStatus"
+                class="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm inline-flex items-center gap-2 glass-button-solid"
+              >
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                  <path d="M20 4v6h-6" />
+                </svg>
+                {{ t('refresh') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -517,7 +530,41 @@
 
       <!-- Services Grid -->
       <div class="mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-3">{{ t('services') }}</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
+          <div class="flex items-center gap-2">
+            <!-- 一键启动所有 -->
+            <button
+              @click="batchControlAll('start')"
+              :disabled="controlling || allServicesRunning"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition
+                     bg-emerald-600/90 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed
+                     glass-button-solid shadow-sm"
+              :title="t('batch_start_all')"
+            >
+              <!-- 播放/启动全部 icon -->
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="6 3 20 12 6 21 6 3" />
+              </svg>
+              <span>{{ t('batch_start_all') }}</span>
+            </button>
+            <!-- 一键停止所有 -->
+            <button
+              @click="batchControlAll('stop')"
+              :disabled="controlling || noServicesRunning"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition
+                     bg-red-600/90 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed
+                     glass-button-solid shadow-sm"
+              :title="t('batch_stop_all')"
+            >
+              <!-- 停止全部 icon -->
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+              <span>{{ t('batch_stop_all') }}</span>
+            </button>
+          </div>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
             v-for="service in servicesStatus"
@@ -1153,6 +1200,119 @@
       </div>
     </div>
 
+    <!-- WebShell Terminal -->
+    <!-- 最小化状态：底部浮动条 -->
+    <div
+      v-if="showTerminal && terminalMode === 'minimized'"
+      class="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-80 cursor-pointer select-none"
+      @click="terminalMode = 'normal'"
+    >
+      <div class="bg-[#2d2d2d] border border-gray-600 border-b-0 rounded-t-lg px-4 py-2.5 flex items-center justify-between shadow-xl">
+        <div class="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-green-400" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+          <span class="text-xs font-medium text-gray-200">{{ t('terminal_title') }}</span>
+          <span
+            class="h-1.5 w-1.5 rounded-full"
+            :class="terminalConnected ? 'bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.6)]' : 'bg-red-400'"
+          ></span>
+        </div>
+        <div class="flex items-center gap-1">
+          <!-- 还原 -->
+          <button @click.stop="terminalMode = 'normal'" class="text-gray-400 hover:text-white p-0.5" :title="t('terminal_restore')">
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+            </svg>
+          </button>
+          <!-- 关闭 -->
+          <button @click.stop="closeTerminal" class="text-gray-400 hover:text-red-400 p-0.5" :title="t('close')">
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正常 / 最大化状态 -->
+    <div
+      v-show="showTerminal && terminalMode !== 'minimized'"
+      class="fixed z-50"
+      :class="terminalMode === 'maximized' ? 'inset-0' : 'inset-0 flex items-center justify-center p-4'"
+      @click.self="terminalMode === 'normal' ? (terminalMode = 'minimized') : null"
+    >
+      <!-- 背景遮罩（仅 normal 模式） -->
+      <div v-if="terminalMode === 'normal'" class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="terminalMode = 'minimized'"></div>
+
+      <div
+        class="relative flex flex-col bg-[#1e1e1e] border border-gray-700 shadow-2xl overflow-hidden"
+        :class="terminalMode === 'maximized'
+          ? 'w-full h-full'
+          : 'rounded-lg w-full max-w-5xl h-[75vh]'"
+      >
+        <!-- Terminal Title Bar -->
+        <div class="flex justify-between items-center px-3 py-1.5 bg-[#2d2d2d] border-b border-gray-700 select-none flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-green-400" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            <span class="text-sm font-medium text-gray-200">{{ t('terminal_title') }}</span>
+            <span
+              class="text-[10px] px-1.5 py-0.5 rounded"
+              :class="terminalConnected ? 'bg-green-600/30 text-green-300' : 'bg-red-600/30 text-red-300'"
+            >
+              {{ terminalConnected ? t('terminal_connected') : t('terminal_disconnected') }}
+            </span>
+          </div>
+          <div class="flex items-center gap-0.5">
+            <!-- 重连 -->
+            <button
+              v-if="!terminalConnected"
+              @click="connectTerminal"
+              class="px-2 py-0.5 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700 transition mr-1"
+            >
+              {{ t('terminal_reconnect') }}
+            </button>
+            <!-- 新窗口弹出 -->
+            <button @click="popoutTerminal" class="term-win-btn" :title="t('terminal_popout')">
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </button>
+            <!-- 最小化 -->
+            <button @click="terminalMode = 'minimized'" class="term-win-btn" :title="t('terminal_minimize')">
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="18" x2="19" y2="18" />
+              </svg>
+            </button>
+            <!-- 最大化 / 还原 -->
+            <button @click="terminalMode = terminalMode === 'maximized' ? 'normal' : 'maximized'" class="term-win-btn" :title="terminalMode === 'maximized' ? t('terminal_restore') : t('terminal_maximize')">
+              <svg v-if="terminalMode !== 'maximized'" viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="7" width="14" height="14" rx="2" />
+                <path d="M9 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" />
+              </svg>
+            </button>
+            <!-- 关闭 -->
+            <button @click="closeTerminal" class="term-win-btn hover:!bg-red-600 hover:!text-white" :title="t('close')">
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Terminal Body -->
+        <div ref="terminalContainer" class="flex-1 overflow-hidden"></div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -1172,10 +1332,24 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as echarts from 'echarts'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
+import '@xterm/xterm/css/xterm.css'
 const logsContainer = ref(null)
 const cpuChartRef = ref(null)
 const memoryChartRef = ref(null)
 const diskChartRef = ref(null)
+const terminalContainer = ref(null)
+
+// ---- WebShell Terminal ----
+const showTerminal = ref(false)
+const terminalConnected = ref(false)
+const terminalMode = ref('normal') // 'normal' | 'minimized' | 'maximized'
+let termInstance = null
+let termFitAddon = null
+let termWs = null
+let termPopoutWindow = null
 
 const authToken = ref(localStorage.getItem('authToken') || '')
 let storedUser = null
@@ -1361,7 +1535,23 @@ const translations = {
     core_level_mid: '中',
     core_level_low: '低',
     core: '核心',
-    no_core_data: '暂无核心数据'
+    no_core_data: '暂无核心数据',
+    terminal: '终端',
+    terminal_title: '终端',
+    terminal_connecting: '正在连接...',
+    terminal_connected: '已连接',
+    terminal_disconnected: '连接已断开',
+    terminal_reconnect: '重连',
+    terminal_minimize: '最小化',
+    terminal_maximize: '最大化',
+    terminal_restore: '还原',
+    terminal_popout: '新窗口打开',
+    batch_start_all: '全部启动',
+    batch_stop_all: '全部停止',
+    batch_start_confirm: '确定要启动所有服务吗？',
+    batch_stop_confirm: '确定要停止所有服务吗？',
+    batch_action_success: '批量{action}操作已执行',
+    batch_action_failed: '批量{action}操作失败',
   },
   en: {
     login: 'Login',
@@ -1504,7 +1694,23 @@ const translations = {
     core_level_mid: 'Medium',
     core_level_low: 'Low',
     core: 'Core',
-    no_core_data: 'No core data'
+    no_core_data: 'No core data',
+    terminal: 'Terminal',
+    terminal_title: 'Terminal',
+    terminal_connecting: 'Connecting...',
+    terminal_connected: 'Connected',
+    terminal_disconnected: 'Disconnected',
+    terminal_reconnect: 'Reconnect',
+    terminal_minimize: 'Minimize',
+    terminal_maximize: 'Maximize',
+    terminal_restore: 'Restore',
+    terminal_popout: 'Pop out',
+    batch_start_all: 'Start All',
+    batch_stop_all: 'Stop All',
+    batch_start_confirm: 'Are you sure you want to start all services?',
+    batch_stop_confirm: 'Are you sure you want to stop all services?',
+    batch_action_success: 'Batch {action} executed successfully',
+    batch_action_failed: 'Batch {action} failed',
   }
 }
 
@@ -1837,6 +2043,229 @@ function onDrop(e, targetName) {
   onDragEnd()
 }
 
+// ---- WebShell Terminal functions ----
+function connectTerminal() {
+  if (termWs) {
+    try { termWs.close() } catch (_) {}
+    termWs = null
+  }
+  const wsUrl = buildWsUrl(`/api/ws/terminal?token=${encodeURIComponent(authToken.value)}`)
+  termWs = new WebSocket(wsUrl)
+  termWs.onopen = () => {
+    terminalConnected.value = true
+    if (termFitAddon && termInstance) {
+      termFitAddon.fit()
+      const dims = { type: 'resize', cols: termInstance.cols, rows: termInstance.rows }
+      termWs.send(JSON.stringify(dims))
+    }
+  }
+  termWs.onmessage = (e) => {
+    if (termInstance) termInstance.write(e.data)
+  }
+  termWs.onclose = () => {
+    terminalConnected.value = false
+  }
+  termWs.onerror = () => {
+    terminalConnected.value = false
+  }
+}
+
+function initTerminal() {
+  if (termInstance) return
+  termInstance = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+    theme: {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#d4d4d4',
+      selectionBackground: '#264f78',
+      black: '#1e1e1e',
+      red: '#f44747',
+      green: '#6a9955',
+      yellow: '#d7ba7d',
+      blue: '#569cd6',
+      magenta: '#c586c0',
+      cyan: '#4ec9b0',
+      white: '#d4d4d4',
+    },
+    scrollback: 5000,
+    allowProposedApi: true,
+  })
+  termFitAddon = new FitAddon()
+  termInstance.loadAddon(termFitAddon)
+  termInstance.loadAddon(new WebLinksAddon())
+  termInstance.open(terminalContainer.value)
+  termFitAddon.fit()
+
+  termInstance.onData((data) => {
+    if (termWs && termWs.readyState === WebSocket.OPEN) {
+      termWs.send(data)
+    }
+  })
+
+  const resizeObserver = new ResizeObserver(() => {
+    if (termFitAddon && showTerminal.value && terminalMode.value !== 'minimized') {
+      termFitAddon.fit()
+      if (termWs && termWs.readyState === WebSocket.OPEN && termInstance) {
+        termWs.send(JSON.stringify({ type: 'resize', cols: termInstance.cols, rows: termInstance.rows }))
+      }
+    }
+  })
+  resizeObserver.observe(terminalContainer.value)
+  termInstance._resizeObserver = resizeObserver
+
+  connectTerminal()
+}
+
+function refitTerminal() {
+  if (termFitAddon && termInstance) {
+    nextTick(() => {
+      termFitAddon.fit()
+      if (termWs && termWs.readyState === WebSocket.OPEN) {
+        termWs.send(JSON.stringify({ type: 'resize', cols: termInstance.cols, rows: termInstance.rows }))
+      }
+      termInstance.focus()
+    })
+  }
+}
+
+function closeTerminal() {
+  showTerminal.value = false
+  terminalMode.value = 'normal'
+  if (termWs) {
+    try { termWs.close() } catch (_) {}
+    termWs = null
+  }
+  if (termInstance) {
+    if (termInstance._resizeObserver) {
+      termInstance._resizeObserver.disconnect()
+    }
+    termInstance.dispose()
+    termInstance = null
+    termFitAddon = null
+  }
+  terminalConnected.value = false
+  if (termPopoutWindow && !termPopoutWindow.closed) {
+    termPopoutWindow.close()
+  }
+  termPopoutWindow = null
+}
+
+function popoutTerminal() {
+  // 关闭内嵌终端的 WS 和实例
+  if (termWs) { try { termWs.close() } catch (_) {} termWs = null }
+  if (termInstance) {
+    if (termInstance._resizeObserver) termInstance._resizeObserver.disconnect()
+    termInstance.dispose()
+    termInstance = null
+    termFitAddon = null
+  }
+  terminalConnected.value = false
+  showTerminal.value = false
+  terminalMode.value = 'normal'
+
+  const wsUrl = buildWsUrl(`/api/ws/terminal?token=${encodeURIComponent(authToken.value)}`)
+  const w = 920, h = 620
+  const left = (screen.width - w) / 2, top = (screen.height - h) / 2
+  const popup = window.open('', '_blank',
+    `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`)
+  if (!popup) return
+  termPopoutWindow = popup
+
+  // 收集当前页面中 xterm 相关的 CSS 规则
+  let xtermCss = ''
+  try {
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          const text = rule.cssText
+          if (text.includes('xterm') || text.includes('.xterm')) {
+            xtermCss += text + '\n'
+          }
+        }
+      } catch (_) { /* cross-origin sheets */ }
+    }
+  } catch (_) {}
+
+  popup.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>${t('terminal_title')}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1e1e1e}
+#term{width:100%;height:100%}
+${xtermCss}
+</style>
+</head><body><div id="term"></div></body></html>`)
+  popup.document.close()
+
+  // 从父窗口作用域在弹窗 DOM 中创建 xterm
+  const setupPopupTerminal = () => {
+    try {
+      if (popup.closed) return
+      const container = popup.document.getElementById('term')
+      if (!container) { setTimeout(setupPopupTerminal, 100); return }
+
+      const term = new Terminal({
+        cursorBlink: true, fontSize: 14,
+        fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Menlo,Monaco,'Courier New',monospace",
+        theme: { background:'#1e1e1e', foreground:'#d4d4d4', cursor:'#d4d4d4',
+          selectionBackground:'#264f78', black:'#1e1e1e', red:'#f44747',
+          green:'#6a9955', yellow:'#d7ba7d', blue:'#569cd6',
+          magenta:'#c586c0', cyan:'#4ec9b0', white:'#d4d4d4' },
+        scrollback: 5000,
+      })
+      const fit = new FitAddon()
+      term.loadAddon(fit)
+      term.open(container)
+      fit.fit()
+
+      const ws = new WebSocket(wsUrl)
+      ws.onopen = () => {
+        fit.fit()
+        ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows }))
+      }
+      ws.onmessage = (e) => term.write(e.data)
+      ws.onclose = () => { term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n') }
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data)
+      })
+      const ro = new popup.ResizeObserver(() => {
+        fit.fit()
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows }))
+        }
+      })
+      ro.observe(container)
+      popup.addEventListener('beforeunload', () => {
+        ro.disconnect(); ws.close(); term.dispose()
+      })
+      term.focus()
+    } catch (e) {
+      if (!popup.closed) setTimeout(setupPopupTerminal, 150)
+    }
+  }
+  setTimeout(setupPopupTerminal, 200)
+}
+
+watch(showTerminal, (val) => {
+  if (val && terminalMode.value !== 'minimized') {
+    nextTick(() => initTerminal())
+  }
+})
+
+watch(terminalMode, (mode, oldMode) => {
+  if (oldMode === 'minimized' && mode !== 'minimized') {
+    // 从最小化还原时 refit
+    nextTick(() => refitTerminal())
+  }
+  if (mode === 'normal' || mode === 'maximized') {
+    nextTick(() => refitTerminal())
+  }
+})
+
 const systemMetrics = ref({
   cpu_percent: 0,
   cpu_count: 0,
@@ -2035,6 +2464,37 @@ const isFocusedTarget = (key) => focusedAlertKey.value === key
 const runningCount = computed(() => {
   return servicesStatus.value.filter(s => getHealthState(s) === 'running').length
 })
+
+const allServicesRunning = computed(() => {
+  return servicesStatus.value.length > 0 && runningCount.value === servicesStatus.value.length
+})
+
+const noServicesRunning = computed(() => {
+  return runningCount.value === 0
+})
+
+const batchControlAll = async (action) => {
+  if (!confirm(t(action === 'start' ? 'batch_start_confirm' : 'batch_stop_confirm'))) return
+  controlling.value = true
+  try {
+    const response = await authorizedFetch('/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    })
+    if (!response.ok) throw new Error(`Failed to ${action} all services`)
+    const data = await response.json()
+    const details = formatControlDetails(data)
+    showNotification(t('batch_action_success', { action: t(action) }), 'success', details)
+    await refreshStatus()
+    schedulePostControlRefresh()
+  } catch (error) {
+    console.error('Batch control error:', error)
+    showNotification(t('batch_action_failed', { action: t(action) }), 'error')
+  } finally {
+    controlling.value = false
+  }
+}
 
 const formattedTimestamp = computed(() => {
   if (!lastUpdated.value) return '—'
@@ -3137,6 +3597,7 @@ onUnmounted(() => {
   })
   stopRepeatAlert()
   if (focusAlertTimer) clearTimeout(focusAlertTimer)
+  closeTerminal()
 })
 </script>
 
@@ -3793,5 +4254,21 @@ onUnmounted(() => {
 .dark .drag-over {
   outline-color: rgba(129, 140, 248, 0.8);
   box-shadow: 0 0 20px rgba(129, 140, 248, 0.2);
+}
+
+/* ---- 终端窗口控制按钮 ---- */
+.term-win-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  color: #9ca3af;
+  transition: background 0.15s, color 0.15s;
+}
+.term-win-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #e5e7eb;
 }
 </style>
