@@ -552,7 +552,7 @@
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
-          <div v-if="canOperate" class="flex items-center gap-2">
+          <div v-if="canOperate && visibleServices.length > 1" class="flex items-center gap-2">
             <!-- 一键启动所有 -->
             <button
               @click="batchControlAll('start')"
@@ -2787,11 +2787,11 @@ const focusAlertTarget = async (alert) => {
 const isFocusedTarget = (key) => focusedAlertKey.value === key
 
 const runningCount = computed(() => {
-  return servicesStatus.value.filter(s => getHealthState(s) === 'running').length
+  return visibleServices.value.filter(s => getHealthState(s) === 'running').length
 })
 
 const allServicesRunning = computed(() => {
-  return servicesStatus.value.length > 0 && runningCount.value === servicesStatus.value.length
+  return visibleServices.value.length > 0 && runningCount.value === visibleServices.value.length
 })
 
 const noServicesRunning = computed(() => {
@@ -2802,15 +2802,24 @@ const batchControlAll = async (action) => {
   if (!confirm(t(action === 'start' ? 'batch_start_confirm' : 'batch_stop_confirm'))) return
   controlling.value = true
   try {
-    const response = await authorizedFetch('/api/control', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action })
-    })
-    if (!response.ok) throw new Error(`Failed to ${action} all services`)
-    const data = await response.json()
-    const details = formatControlDetails(data)
-    showNotification(t('batch_action_success', { action: t(action) }), 'success', details)
+    const targets = visibleServices.value.map(s => s.name)
+    const results = await Promise.allSettled(
+      targets.map(name =>
+        authorizedFetch('/api/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, service: name })
+        })
+      )
+    )
+    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok))
+    if (failed.length === 0) {
+      showNotification(t('batch_action_success', { action: t(action) }), 'success')
+    } else if (failed.length < targets.length) {
+      showNotification(t('batch_action_success', { action: t(action) }) + ` (${failed.length} failed)`, 'warning')
+    } else {
+      showNotification(t('batch_action_failed', { action: t(action) }), 'error')
+    }
     await refreshStatus()
     schedulePostControlRefresh()
   } catch (error) {
