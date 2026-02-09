@@ -62,7 +62,12 @@
       "log": "service_D.log",
       "pidfile": "service_D.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "scheduled_restart": {
+        "enabled": false,
+        "cron": "",
+        "last_restart": null
+      }
     },
     {
       "name": "service_E",
