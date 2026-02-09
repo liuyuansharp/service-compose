@@ -91,6 +91,12 @@ LOG_INDEX_CACHE: Dict[str, Dict] = {}
 AUDIT_LOG_FILE = SERVICE_DIR / 'logs' / 'audit.json'
 AUDIT_LOG_MAX_ENTRIES = 5000
 
+# System-level metrics persistent history (CPU% & memory%)
+SYSTEM_METRICS_FILE = LOGS_DIR / 'system_metrics_history.json'
+SYSTEM_METRICS_PERSIST_INTERVAL = 60  # seconds – append one point per minute
+SYSTEM_METRICS_MAX_DAYS = 30
+SYSTEM_METRICS_MAX_POINTS = SYSTEM_METRICS_MAX_DAYS * 24 * 60  # 43200 points @ 1min
+
 
 # ==================== Authentication Helpers ====================
 
@@ -467,6 +473,46 @@ async def _metrics_sampler():
             logger.warning(f"Metrics sampler error: {e}")
 
         await asyncio.sleep(METRICS_INTERVAL_SECONDS)
+
+
+# ==================== System Metrics Persistent History ====================
+
+def _load_system_metrics_history() -> List[Dict]:
+    """Load system metrics history from disk."""
+    if not SYSTEM_METRICS_FILE.exists():
+        return []
+    try:
+        data = json.loads(SYSTEM_METRICS_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _save_system_metrics_history(entries: List[Dict]):
+    """Save system metrics history to disk with size cap."""
+    if len(entries) > SYSTEM_METRICS_MAX_POINTS:
+        entries = entries[-SYSTEM_METRICS_MAX_POINTS:]
+    SYSTEM_METRICS_FILE.write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+
+
+async def _system_metrics_persist_loop():
+    """Background loop: every 60s append a system-level CPU/memory point to persistent file."""
+    logger.info("System metrics persistent sampler started")
+    while True:
+        await asyncio.sleep(SYSTEM_METRICS_PERSIST_INTERVAL)
+        try:
+            cpu = psutil.cpu_percent(interval=0)
+            mem = psutil.virtual_memory()
+            point = {
+                "t": datetime.now().isoformat(),
+                "c": round(cpu, 1),
+                "m": round(mem.percent, 1),
+            }
+            entries = _load_system_metrics_history()
+            entries.append(point)
+            _save_system_metrics_history(entries)
+        except Exception as e:
+            logger.warning(f"System metrics persist error: {e}")
 
 
 async def _log_maintenance():
@@ -1581,6 +1627,11 @@ async def _start_metrics_sampler():
 
 
 @app.on_event("startup")
+async def _start_system_metrics_persist():
+    asyncio.create_task(_system_metrics_persist_loop())
+
+
+@app.on_event("startup")
 async def _start_log_maintenance():
     asyncio.create_task(_log_maintenance())
 
@@ -1952,6 +2003,48 @@ async def get_metrics_history(
         }
     except Exception as e:
         logger.error(f"Failed to get metrics history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Time range presets for system metrics history
+_RANGE_SECONDS = {
+    "1h": 3600,
+    "6h": 6 * 3600,
+    "24h": 24 * 3600,
+    "7d": 7 * 24 * 3600,
+    "30d": 30 * 24 * 3600,
+}
+
+@app.get("/api/system-metrics/history")
+async def get_system_metrics_history(
+    range: str = Query("1h"),
+    current_user: dict = Depends(get_current_user),
+) -> Dict:
+    """Return system-level CPU/memory history for a given time range.
+    range: 1h | 6h | 24h | 7d | 30d | all
+    """
+    try:
+        entries = _load_system_metrics_history()
+        now = datetime.now()
+
+        # Filter by time range
+        if range != "all" and range in _RANGE_SECONDS:
+            cutoff = now - timedelta(seconds=_RANGE_SECONDS[range])
+            entries = [e for e in entries if _parse_iso_timestamp(e.get("t")) and _parse_iso_timestamp(e.get("t")) >= cutoff]
+
+        # Downsample for large ranges to keep response small (~500 points max)
+        max_points = 500
+        if len(entries) > max_points:
+            step = len(entries) // max_points
+            entries = entries[::step]
+
+        return {
+            "range": range,
+            "points": entries,
+            "count": len(entries),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get system metrics history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

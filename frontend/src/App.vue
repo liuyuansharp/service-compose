@@ -356,6 +356,14 @@
                 >
                   {{ t('core_usage') }}
                 </button>
+                <span class="text-gray-300 dark:text-gray-600">|</span>
+                <button
+                  @click="openMetricsTrend('cpu')"
+                  class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  {{ t('trend') }}
+                </button>
               </div>
             </div>
       <div class="w-16 h-16 rounded-full border-4" 
@@ -393,6 +401,13 @@
               <p class="text-xs text-gray-600 dark:text-slate-400 mt-2">
                 {{ systemMetrics.memory_used }} / {{ systemMetrics.memory_total }} MB
               </p>
+              <button
+                @click="openMetricsTrend('memory')"
+                class="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 mt-1"
+              >
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                {{ t('trend') }}
+              </button>
             </div>
       <div class="w-16 h-16 rounded-full border-4"
         :class="[
@@ -1757,6 +1772,60 @@
       </div>
     </div>
 
+    <!-- System Metrics Trend Modal -->
+    <div
+      v-if="showMetricsTrend"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="showMetricsTrend = false"
+    >
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showMetricsTrend = false"></div>
+      <div class="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-lg flex items-center justify-center"
+              :class="metricsTrendType === 'cpu' ? 'bg-blue-100 dark:bg-blue-500/20' : 'bg-purple-100 dark:bg-purple-500/20'">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" :class="metricsTrendType === 'cpu' ? 'text-blue-600 dark:text-blue-400' : 'text-purple-600 dark:text-purple-400'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ metricsTrendType === 'cpu' ? t('cpu_trend_title') : t('mem_trend_title') }}
+            </h3>
+          </div>
+          <button @click="showMetricsTrend = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1">
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <!-- Time Range Tabs -->
+        <div class="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2 flex-shrink-0 overflow-x-auto">
+          <button
+            v-for="r in trendRangeOptions"
+            :key="r.value"
+            @click="trendRange = r.value; loadMetricsTrend()"
+            class="px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap"
+            :class="trendRange === r.value
+              ? (metricsTrendType === 'cpu' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white')
+              : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'"
+          >{{ r.label }}</button>
+        </div>
+        <!-- Chart Area -->
+        <div class="flex-1 p-6 min-h-0">
+          <div v-if="trendLoading" class="h-full flex items-center justify-center text-sm text-gray-400">
+            {{ t('loading_info') }}
+          </div>
+          <div v-else-if="trendData.length === 0" class="h-full flex items-center justify-center text-sm text-gray-400">
+            {{ t('trend_no_data') }}
+          </div>
+          <div v-else ref="trendChartRef" class="w-full" style="height: 380px;"></div>
+        </div>
+        <!-- Footer info -->
+        <div class="px-6 py-2 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+          {{ t('trend_points', { count: trendData.length }) }}
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -2099,6 +2168,18 @@ const translations = {
     sched_enabled_label: '已启用',
     sched_cron_label: '计划',
     audit_action_update_schedule: '定时设置',
+    // System Metrics Trend
+    trend: '趋势',
+    cpu_trend_title: 'CPU 使用率趋势',
+    mem_trend_title: '内存使用率趋势',
+    range_1h: '最近1小时',
+    range_6h: '最近6小时',
+    range_24h: '最近24小时',
+    range_7d: '最近7天',
+    range_30d: '最近30天',
+    range_all: '全部历史',
+    trend_no_data: '暂无趋势数据，系统每分钟采集一次',
+    trend_points: '共 {count} 个数据点',
   },
   en: {
     login: 'Login',
@@ -2337,6 +2418,18 @@ const translations = {
     sched_enabled_label: 'Enabled',
     sched_cron_label: 'Schedule',
     audit_action_update_schedule: 'Schedule Update',
+    // System Metrics Trend
+    trend: 'Trend',
+    cpu_trend_title: 'CPU Usage Trend',
+    mem_trend_title: 'Memory Usage Trend',
+    range_1h: 'Last 1h',
+    range_6h: 'Last 6h',
+    range_24h: 'Last 24h',
+    range_7d: 'Last 7d',
+    range_30d: 'Last 30d',
+    range_all: 'All History',
+    trend_no_data: 'No trend data yet. System samples every minute.',
+    trend_points: '{count} data points',
   }
 }
 
@@ -2938,6 +3031,16 @@ const rollbackPendingBackup = ref('')
 // ---- Scheduled Restart ----
 const schedForm = reactive({ enabled: false, time: '03:00', weekdays: [] })
 const currentSchedNext = ref(null)
+
+// ---- System Metrics Trend ----
+const showMetricsTrend = ref(false)
+const metricsTrendType = ref('cpu')  // 'cpu' or 'memory'
+const trendRange = ref('1h')
+const trendData = ref([])
+const trendLoading = ref(false)
+const trendChartRef = ref(null)
+let trendChartInstance = null
+
 const statusFetchedAt = ref(0)
 const statusTicker = ref(0)
 let statusUptimeInterval = null
@@ -3376,6 +3479,113 @@ const saveScheduledRestart = async () => {
     showNotification(e.message, 'error')
   }
 }
+
+// ---- System Metrics Trend Functions ----
+const trendRangeOptions = computed(() => [
+  { value: '1h', label: t('range_1h') },
+  { value: '6h', label: t('range_6h') },
+  { value: '24h', label: t('range_24h') },
+  { value: '7d', label: t('range_7d') },
+  { value: '30d', label: t('range_30d') },
+  { value: 'all', label: t('range_all') },
+])
+
+const openMetricsTrend = (type) => {
+  metricsTrendType.value = type
+  trendRange.value = '1h'
+  showMetricsTrend.value = true
+  trendData.value = []
+  loadMetricsTrend()
+}
+
+const loadMetricsTrend = async () => {
+  trendLoading.value = true
+  try {
+    const response = await authorizedFetch(`/api/system-metrics/history?range=${trendRange.value}`)
+    if (response.ok) {
+      const data = await response.json()
+      trendData.value = data.points || []
+      nextTick(() => renderTrendChart())
+    }
+  } catch (e) {
+    console.error('Load metrics trend error:', e)
+  } finally {
+    trendLoading.value = false
+  }
+}
+
+const renderTrendChart = () => {
+  if (!trendChartRef.value || !trendData.value.length) return
+  // Lazy-init or reuse echarts instance
+  if (trendChartInstance) {
+    trendChartInstance.dispose()
+  }
+  // Use the globally available echarts
+  if (typeof echarts === 'undefined') return
+  trendChartInstance = echarts.init(trendChartRef.value, isDark.value ? 'dark' : undefined)
+  const isCpu = metricsTrendType.value === 'cpu'
+  const times = trendData.value.map(p => {
+    const d = new Date(p.t)
+    const pad = (n) => String(n).padStart(2, '0')
+    // Show date+time for ranges >= 7d
+    if (['7d', '30d', 'all'].includes(trendRange.value)) {
+      return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  })
+  const values = trendData.value.map(p => isCpu ? p.c : p.m)
+  const color = isCpu ? '#3b82f6' : '#a855f7'
+  const areaColor = isCpu
+    ? { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.25)' }, { offset: 1, color: 'rgba(59,130,246,0.02)' }] }
+    : { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(168,85,247,0.25)' }, { offset: 1, color: 'rgba(168,85,247,0.02)' }] }
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const p = params[0]
+        return `<div style="font-size:12px">${p.name}<br/><strong>${p.value}%</strong></div>`
+      }
+    },
+    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: times,
+      axisLabel: { fontSize: 10, color: '#9ca3af', rotate: times.length > 100 ? 45 : 0 },
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLabel: { fontSize: 10, color: '#9ca3af', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: isDark.value ? '#334155' : '#f3f4f6' } },
+    },
+    series: [{
+      type: 'line',
+      data: values,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2, color },
+      areaStyle: { color: areaColor },
+    }],
+    dataZoom: [{
+      type: 'inside',
+      start: 0,
+      end: 100,
+    }],
+  }
+  trendChartInstance.setOption(option)
+}
+
+// Clean up chart on modal close
+watch(showMetricsTrend, (val) => {
+  if (!val && trendChartInstance) {
+    trendChartInstance.dispose()
+    trendChartInstance = null
+  }
+})
 
 const formattedTimestamp = computed(() => {
   if (!lastUpdated.value) return '—'
