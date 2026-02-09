@@ -1,7 +1,10 @@
 {
   "platform": {
     "cmd": "./examples/dummy_service.sh",
-    "args": ["platform", "60"],
+    "args": [
+      "platform",
+      "60"
+    ],
     "log": "platform.log",
     "pidfile": "platform.pid",
     "restart_on_exit": true,
@@ -11,7 +14,10 @@
     {
       "name": "service_A",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_A", "45"],
+      "args": [
+        "service_A",
+        "45"
+      ],
       "log": "service_A.log",
       "pidfile": "service_A.pid",
       "restart_on_exit": true,
@@ -20,7 +26,10 @@
     {
       "name": "service_B",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_B", "50"],
+      "args": [
+        "service_B",
+        "50"
+      ],
       "log": "service_B.log",
       "pidfile": "service_B.pid",
       "restart_on_exit": true,
@@ -29,7 +38,10 @@
     {
       "name": "service_C",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_C", "50"],
+      "args": [
+        "service_C",
+        "50"
+      ],
       "log": "service_C.log",
       "pidfile": "service_C.pid",
       "restart_on_exit": true,
@@ -38,7 +50,10 @@
     {
       "name": "service_D",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_D", "50"],
+      "args": [
+        "service_D",
+        "50"
+      ],
       "log": "service_D.log",
       "pidfile": "service_D.pid",
       "restart_on_exit": true,
@@ -47,7 +62,10 @@
     {
       "name": "service_E",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_E", "50"],
+      "args": [
+        "service_E",
+        "50"
+      ],
       "log": "service_E.log",
       "pidfile": "service_E.pid",
       "restart_on_exit": true,
@@ -56,7 +74,10 @@
     {
       "name": "service_F",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_F", "50"],
+      "args": [
+        "service_F",
+        "50"
+      ],
       "log": "service_F.log",
       "pidfile": "service_F.pid",
       "restart_on_exit": true,
@@ -65,7 +86,10 @@
     {
       "name": "service_G",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_G", "50"],
+      "args": [
+        "service_G",
+        "50"
+      ],
       "log": "service_G.log",
       "pidfile": "service_G.pid",
       "restart_on_exit": true,
@@ -74,7 +98,10 @@
     {
       "name": "service_H",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_H", "50"],
+      "args": [
+        "service_H",
+        "50"
+      ],
       "log": "service_H.log",
       "pidfile": "service_H.pid",
       "restart_on_exit": true,
@@ -83,12 +110,14 @@
     {
       "name": "service_I",
       "cmd": "./examples/dummy_service.sh",
-      "args": ["service_I", "50"],
+      "args": [
+        "service_I",
+        "50"
+      ],
       "log": "service_I.log",
       "pidfile": "service_I.pid",
       "restart_on_exit": true,
       "heartbeat": "mock"
     }
-
   ]
 }

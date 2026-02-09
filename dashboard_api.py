@@ -68,6 +68,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+
 # Metrics history storage (24h by default)
 METRICS_INTERVAL_SECONDS = 10
 METRICS_HISTORY_HOURS = 24
@@ -1006,6 +1007,37 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "username": current_user["username"],
         "created_at": current_user.get("created_at")
     }
+
+
+# ==================== Service Order (config file) ====================
+
+@app.put("/api/preferences/service-order")
+async def put_service_order(request: Request, current_user: dict = Depends(get_current_user)):
+    """按拖拽顺序重排配置文件中 services 列表"""
+    body = await request.json()
+    order = body.get("order", [])
+    if not isinstance(order, list) or not all(isinstance(n, str) for n in order):
+        raise HTTPException(status_code=400, detail="order must be a list of service name strings")
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        services = config.get("services", [])
+        svc_map = {s["name"]: s for s in services}
+        # 按传入顺序排列，未在 order 中的追加到末尾
+        reordered = []
+        for name in order:
+            if name in svc_map:
+                reordered.append(svc_map.pop(name))
+        for s in svc_map.values():
+            reordered.append(s)
+        config["services"] = reordered
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+            f.write('\n')
+        return {"ok": True, "order": [s["name"] for s in reordered]}
+    except Exception as e:
+        logger.error(f"Failed to save service order: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/disks", response_model=List[DiskPartitionInfo])

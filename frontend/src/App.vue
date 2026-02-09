@@ -523,8 +523,19 @@
             v-for="service in servicesStatus"
             :key="service.name"
             :id="serviceCardId(service.name)"
-            class="tech-card rounded-md p-4 transition"
-            :class="[getServiceBorderClass(service), getHealthBgClass(getHealthState(service)), isFocusedTarget(`service:${service.name}`) ? 'service-focus' : '']"
+            draggable="true"
+            @dragstart="onDragStart($event, service.name)"
+            @dragend="onDragEnd"
+            @dragover="onDragOver($event, service.name)"
+            @dragleave="onDragLeave($event, service.name)"
+            @drop="onDrop($event, service.name)"
+            class="tech-card rounded-md p-4 transition service-draggable"
+            :class="[
+              getServiceBorderClass(service),
+              getHealthBgClass(getHealthState(service)),
+              isFocusedTarget(`service:${service.name}`) ? 'service-focus' : '',
+              dragState.over === service.name && dragState.dragging !== service.name ? 'drag-over' : ''
+            ]"
           >
             <div class="flex justify-between items-start mb-4">
               <div>
@@ -1544,7 +1555,7 @@ const setupDashboardSSE = () => {
     try {
       const data = JSON.parse(event.data)
       platformStatus.value = data.platform
-      servicesStatus.value = data.services
+      mergeServicesData(data.services)
       systemMetrics.value = data.metrics
       lastUpdated.value = data.timestamp
       statusFetchedAt.value = Date.now()
@@ -1722,6 +1733,110 @@ const platformStatus = ref({
 })
 
 const servicesStatus = ref([])
+
+// ---- 服务卡片拖拽排序 ----
+const dragState = reactive({
+  dragging: null,    // 被拖拽的 service name
+  over: null,        // 当前悬停的 service name
+})
+let _orderSavePending = false  // 拖拽保存还未完成时，SSE 更新保持本地顺序
+
+/**
+ * 用服务器最新数据更新 servicesStatus，但保持本地已有顺序
+ * （当拖拽保存还在飞行中时，避免 SSE 覆盖回旧顺序）
+ */
+function mergeServicesData(incoming) {
+  if (!servicesStatus.value.length || !_orderSavePending) {
+    // 没有待保存的排序操作，直接使用服务器顺序
+    servicesStatus.value = incoming
+    return
+  }
+  // 有待保存操作，保留本地顺序，仅更新每个服务的数据
+  const map = new Map(incoming.map(s => [s.name, s]))
+  const merged = []
+  for (const local of servicesStatus.value) {
+    if (map.has(local.name)) {
+      merged.push(map.get(local.name))
+      map.delete(local.name)
+    }
+  }
+  // 追加新增服务
+  for (const s of map.values()) merged.push(s)
+  servicesStatus.value = merged
+}
+
+let _saveOrderTimer = null
+function saveServiceOrder(order) {
+  _orderSavePending = true
+  // 防抖：避免快速连续拖拽时频繁请求
+  clearTimeout(_saveOrderTimer)
+  _saveOrderTimer = setTimeout(async () => {
+    try {
+      await authorizedFetch('/api/preferences/service-order', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order })
+      })
+    } catch (e) {
+      console.warn('Failed to save service order:', e)
+    } finally {
+      _orderSavePending = false
+    }
+  }, 300)
+}
+
+function onDragStart(e, serviceName) {
+  dragState.dragging = serviceName
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', serviceName)
+  requestAnimationFrame(() => {
+    const el = document.getElementById(serviceCardId(serviceName))
+    if (el) el.classList.add('drag-ghost')
+  })
+}
+function onDragEnd() {
+  if (dragState.dragging) {
+    const el = document.getElementById(serviceCardId(dragState.dragging))
+    if (el) el.classList.remove('drag-ghost')
+  }
+  dragState.dragging = null
+  dragState.over = null
+}
+function onDragOver(e, serviceName) {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+  if (dragState.over !== serviceName) {
+    dragState.over = serviceName
+  }
+}
+function onDragLeave(e, serviceName) {
+  const card = document.getElementById(serviceCardId(serviceName))
+  if (card && !card.contains(e.relatedTarget)) {
+    if (dragState.over === serviceName) dragState.over = null
+  }
+}
+function onDrop(e, targetName) {
+  e.preventDefault()
+  const srcName = dragState.dragging
+  if (!srcName || srcName === targetName) {
+    onDragEnd()
+    return
+  }
+  // 在当前 servicesStatus 中交换位置
+  const list = servicesStatus.value.map(s => s.name)
+  const srcIdx = list.indexOf(srcName)
+  const tgtIdx = list.indexOf(targetName)
+  if (srcIdx < 0 || tgtIdx < 0) { onDragEnd(); return }
+  // 直接重排 servicesStatus，即时生效
+  const arr = [...servicesStatus.value]
+  const [removed] = arr.splice(srcIdx, 1)
+  arr.splice(tgtIdx, 0, removed)
+  servicesStatus.value = arr
+  // 持久化到后端配置文件
+  saveServiceOrder(arr.map(s => s.name))
+  onDragEnd()
+}
+
 const systemMetrics = ref({
   cpu_percent: 0,
   cpu_count: 0,
@@ -2659,7 +2774,7 @@ const refreshStatus = async () => {
     
     const data = await response.json()
     platformStatus.value = data.platform
-    servicesStatus.value = data.services
+    mergeServicesData(data.services)
     systemMetrics.value = data.metrics
     lastUpdated.value = data.timestamp
   statusFetchedAt.value = Date.now()
@@ -2674,7 +2789,7 @@ const refreshStatus = async () => {
       
       const data = await response.json()
       platformStatus.value = data.platform
-      servicesStatus.value = data.services
+      mergeServicesData(data.services)
       lastUpdated.value = data.timestamp
   statusFetchedAt.value = Date.now()
   statusTicker.value = Date.now()
@@ -3654,5 +3769,29 @@ onUnmounted(() => {
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
+}
+
+/* ---- 服务卡片拖拽排序 ---- */
+.service-draggable {
+  cursor: grab;
+  user-select: none;
+}
+.service-draggable:active {
+  cursor: grabbing;
+}
+.drag-ghost {
+  opacity: 0.35 !important;
+  transform: scale(0.96);
+  box-shadow: none !important;
+}
+.drag-over {
+  outline: 2px dashed rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
+  transition: outline 0.15s, box-shadow 0.15s;
+}
+.dark .drag-over {
+  outline-color: rgba(129, 140, 248, 0.8);
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.2);
 }
 </style>
