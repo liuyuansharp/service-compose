@@ -87,6 +87,10 @@ MAX_LOG_BACKUPS = 10
 LOG_INDEX_STRIDE = 1000
 LOG_INDEX_CACHE: Dict[str, Dict] = {}
 
+# Audit log file
+AUDIT_LOG_FILE = SERVICE_DIR / 'logs' / 'audit.json'
+AUDIT_LOG_MAX_ENTRIES = 5000
+
 
 # ==================== Authentication Helpers ====================
 
@@ -1014,8 +1018,10 @@ async def run_update_task(task_id: str, service: str, file_path: Path):
 async def login(login_data: LoginRequest):
     user = authenticate_user(login_data.username, login_data.password)
     if not user:
+        append_audit_log(user=login_data.username, role="unknown", action="login", result="failed", detail="invalid credentials")
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     token = create_access_token({"sub": user["username"]})
+    append_audit_log(user=user["username"], role=user.get("role", "admin"), action="login")
     return {
         "token": token,
         "user": {
@@ -1053,6 +1059,70 @@ def require_admin(current_user: dict):
 def require_operator(current_user: dict):
     """Admin and operator can perform write operations."""
     require_role(current_user, "admin", "operator")
+
+
+# ==================== Audit Log ====================
+
+import threading
+_audit_lock = threading.Lock()
+
+
+def append_audit_log(user: str, role: str, action: str, target: str = "", detail: str = "", result: str = "success"):
+    """Append an entry to the audit log JSON file."""
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "user": user,
+        "role": role,
+        "action": action,
+        "target": target,
+        "detail": detail,
+        "result": result,
+    }
+    try:
+        with _audit_lock:
+            entries = []
+            if AUDIT_LOG_FILE.exists():
+                try:
+                    entries = json.loads(AUDIT_LOG_FILE.read_text(encoding="utf-8"))
+                except Exception:
+                    entries = []
+            entries.append(entry)
+            # Keep only the latest N entries
+            if len(entries) > AUDIT_LOG_MAX_ENTRIES:
+                entries = entries[-AUDIT_LOG_MAX_ENTRIES:]
+            AUDIT_LOG_FILE.write_text(json.dumps(entries, ensure_ascii=False, indent=None), encoding="utf-8")
+    except Exception as exc:
+        logger.warning(f"Failed to write audit log: {exc}")
+
+
+def read_audit_logs(limit: int = 200, offset: int = 0, username: Optional[str] = None) -> Tuple[List[Dict], int]:
+    """Read audit log entries with optional filtering by username."""
+    if not AUDIT_LOG_FILE.exists():
+        return [], 0
+    try:
+        entries = json.loads(AUDIT_LOG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return [], 0
+    if username:
+        entries = [e for e in entries if e.get("user") == username]
+    total = len(entries)
+    # Return newest first
+    entries = list(reversed(entries))
+    entries = entries[offset:offset + limit]
+    return entries, total
+
+
+@app.get("/api/audit-logs")
+async def get_audit_logs(
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get audit logs. Admin sees all; others see only their own."""
+    role = current_user.get("role", "admin")
+    username_filter = None if role == "admin" else current_user["username"]
+    entries, total = read_audit_logs(limit=limit, offset=offset, username=username_filter)
+    return {"logs": entries, "total": total, "offset": offset, "limit": limit}
 
 
 # ==================== User Management APIs (admin only) ====================
@@ -1123,6 +1193,7 @@ async def create_user(req: UserCreateRequest, current_user: dict = Depends(get_c
         session.add(user)
         session.commit()
         session.refresh(user)
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action="create_user", target=req.username, detail=f"role={req.role}")
         return {"status": "success", "id": user.id, "username": user.username}
     finally:
         session.close()
@@ -1150,7 +1221,15 @@ async def update_user(user_id: int, req: UserUpdateRequest, current_user: dict =
             user.password_hash = pwd_context.hash(req.password)
         if req.visible_cards is not None:
             user.visible_cards = json.dumps(req.visible_cards) if req.visible_cards else ""
+        changes = []
+        if req.role is not None:
+            changes.append(f"role={req.role}")
+        if req.password is not None and req.password.strip():
+            changes.append("password=***")
+        if req.visible_cards is not None:
+            changes.append(f"visible_cards={len(req.visible_cards)} items")
         session.commit()
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action="update_user", target=user.username, detail=", ".join(changes))
         return {"status": "success"}
     finally:
         session.close()
@@ -1173,6 +1252,7 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
                 raise HTTPException(status_code=400, detail="Cannot delete the last admin user")
         session.delete(user)
         session.commit()
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action="delete_user", target=user.username)
         return {"status": "success"}
     finally:
         session.close()
@@ -1242,6 +1322,13 @@ async def upload_update_package(
         "update_progress": 0,
         "message": "Upload completed"
     }
+    append_audit_log(
+        user=current_user["username"],
+        role=current_user.get("role", "admin"),
+        action="upload",
+        target=service,
+        detail=f"file={file.filename}",
+    )
     asyncio.create_task(run_update_task(task_id, service, file_path))
     return {"task_id": task_id}
 
@@ -1279,8 +1366,16 @@ async def rollback_update(
     require_operator(current_user)
     try:
         rollback_to_backup(service, backup)
+        append_audit_log(
+            user=current_user["username"],
+            role=current_user.get("role", "admin"),
+            action="rollback",
+            target=service,
+            detail=f"backup={backup}",
+        )
         return {"status": "success", "message": "rollback completed"}
     except Exception as exc:
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action="rollback", target=service, detail=f"backup={backup}", result="failed")
         raise HTTPException(status_code=400, detail=str(exc))
 
 @app.on_event("startup")
@@ -1464,6 +1559,12 @@ async def control_service(control: ServiceControl, current_user: dict = Depends(
             )
         
         logger.info(f"Successfully executed '{control.action}'")
+        append_audit_log(
+            user=current_user["username"],
+            role=current_user.get("role", "admin"),
+            action=control.action,
+            target=control.service or "all",
+        )
         return {
             "status": "success",
             "action": control.action,
@@ -1475,9 +1576,13 @@ async def control_service(control: ServiceControl, current_user: dict = Depends(
         }
     except subprocess.TimeoutExpired:
         logger.error("Command timeout")
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail="timeout")
         raise HTTPException(status_code=500, detail="Command timeout")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Control error: {e}")
+        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 

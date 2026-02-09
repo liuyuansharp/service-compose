@@ -183,6 +183,21 @@
                 </svg>
                 {{ t('user_management') }}
               </button>
+              <!-- 操作日志 -->
+              <button
+                @click="showAuditLog = true; loadAuditLogs()"
+                class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
+                :title="t('audit_log')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                {{ t('audit_log') }}
+              </button>
               <button
                 @click="logout()"
                 class="px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
@@ -1549,6 +1564,125 @@
       </div>
     </div>
 
+    <!-- Audit Log Modal -->
+    <div
+      v-if="showAuditLog"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="showAuditLog = false"
+    >
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showAuditLog = false"></div>
+      <div class="relative w-full max-w-5xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" class="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('audit_log') }}</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('audit_log_desc') }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="loadAuditLogs()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">{{ t('refresh') }}</button>
+            <button @click="showAuditLog = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Filter Bar -->
+        <div class="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 flex-shrink-0">
+          <select
+            v-model="auditFilter.action"
+            class="px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-xs text-gray-800 dark:text-gray-200 focus:outline-none"
+          >
+            <option value="">{{ t('audit_filter_all_actions') }}</option>
+            <option value="login">{{ t('audit_action_login') }}</option>
+            <option value="start">{{ t('audit_action_start') }}</option>
+            <option value="stop">{{ t('audit_action_stop') }}</option>
+            <option value="restart">{{ t('audit_action_restart') }}</option>
+            <option value="upload">{{ t('audit_action_upload') }}</option>
+            <option value="rollback">{{ t('audit_action_rollback') }}</option>
+            <option value="create_user">{{ t('audit_action_create_user') }}</option>
+            <option value="update_user">{{ t('audit_action_update_user') }}</option>
+            <option value="delete_user">{{ t('audit_action_delete_user') }}</option>
+          </select>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('audit_total', { count: auditTotal }) }}</span>
+          <span v-if="!isAdmin" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ t('audit_own_only') }}</span>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-gray-50 dark:bg-slate-800/80 backdrop-blur-sm z-10">
+              <tr class="border-b border-gray-200 dark:border-gray-700">
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_time') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_user') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_role') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_action') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_target') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_detail') }}</th>
+                <th class="text-left py-2.5 px-4 font-medium text-gray-600 dark:text-gray-400 text-xs">{{ t('audit_col_result') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(entry, idx) in filteredAuditLogs"
+                :key="idx"
+                class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition"
+              >
+                <td class="py-2 px-4 text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">{{ formatAuditTime(entry.timestamp) }}</td>
+                <td class="py-2 px-4">
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="h-5 w-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">{{ entry.user?.charAt(0)?.toUpperCase() || '?' }}</span>
+                    <span class="text-xs font-medium text-gray-800 dark:text-gray-200">{{ entry.user }}</span>
+                  </span>
+                </td>
+                <td class="py-2 px-4">
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full"
+                    :class="entry.role === 'admin' ? 'bg-red-500/15 text-red-500' : entry.role === 'operator' ? 'bg-blue-500/15 text-blue-500' : 'bg-gray-500/15 text-gray-500'"
+                  >{{ t('role_' + (entry.role || 'unknown')) }}</span>
+                </td>
+                <td class="py-2 px-4">
+                  <span class="text-xs px-2 py-0.5 rounded-md font-medium"
+                    :class="auditActionClass(entry.action)"
+                  >{{ t('audit_action_' + entry.action) || entry.action }}</span>
+                </td>
+                <td class="py-2 px-4 text-xs text-gray-700 dark:text-gray-300 font-mono">{{ entry.target || '—' }}</td>
+                <td class="py-2 px-4 text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate" :title="entry.detail">{{ entry.detail || '—' }}</td>
+                <td class="py-2 px-4">
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                    :class="entry.result === 'success' ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-red-500/15 text-red-600 dark:text-red-400'"
+                  >{{ entry.result === 'success' ? t('audit_result_success') : t('audit_result_failed') }}</span>
+                </td>
+              </tr>
+              <tr v-if="filteredAuditLogs.length === 0">
+                <td colspan="7" class="py-8 text-center text-sm text-gray-400 dark:text-gray-500">{{ t('audit_empty') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div v-if="auditTotal > auditLimit" class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+          <button
+            @click="auditOffset = Math.max(0, auditOffset - auditLimit); loadAuditLogs()"
+            :disabled="auditOffset <= 0"
+            class="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >{{ t('audit_prev') }}</button>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{ auditOffset + 1 }}–{{ Math.min(auditOffset + auditLimit, auditTotal) }} / {{ auditTotal }}</span>
+          <button
+            @click="auditOffset = auditOffset + auditLimit; loadAuditLogs()"
+            :disabled="auditOffset + auditLimit >= auditTotal"
+            class="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >{{ t('audit_next') }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -1598,6 +1732,15 @@ const editingUserId = ref(null)
 const showResetPassword = ref(false)
 const resetPasswordUser = ref(null)
 const resetPasswordValue = ref('')
+
+// ---- Audit Log ----
+const showAuditLog = ref(false)
+const auditLogs = ref([])
+const auditTotal = ref(0)
+const auditLoading = ref(false)
+const auditOffset = ref(0)
+const auditLimit = ref(50)
+const auditFilter = reactive({ action: '' })
 
 const authToken = ref(localStorage.getItem('authToken') || '')
 let storedUser = null
@@ -1838,6 +1981,37 @@ const translations = {
     password_reset_success: '密码重置成功',
     delete_user_confirm: '确定要删除用户 {user} 吗？',
     permission_denied: '权限不足',
+    // Audit Log
+    audit_log: '操作日志',
+    audit_log_desc: '记录所有用户操作历史',
+    audit_col_time: '时间',
+    audit_col_user: '用户',
+    audit_col_role: '角色',
+    audit_col_action: '操作',
+    audit_col_target: '目标',
+    audit_col_detail: '详情',
+    audit_col_result: '结果',
+    audit_result_success: '成功',
+    audit_result_failed: '失败',
+    audit_action_login: '登录',
+    audit_action_start: '启动',
+    audit_action_stop: '停止',
+    audit_action_restart: '重启',
+    audit_action_upload: '上传',
+    audit_action_rollback: '回滚',
+    audit_action_create_user: '创建用户',
+    audit_action_update_user: '更新用户',
+    audit_action_delete_user: '删除用户',
+    audit_filter_all_actions: '全部操作',
+    audit_total: '共 {count} 条',
+    audit_own_only: '仅显示本人操作',
+    audit_empty: '暂无操作记录',
+    audit_prev: '上一页',
+    audit_next: '下一页',
+    role_admin: '管理员',
+    role_operator: '操作员',
+    role_readonly: '只读',
+    role_unknown: '未知',
   },
   en: {
     login: 'Login',
@@ -2032,6 +2206,37 @@ const translations = {
     password_reset_success: 'Password reset successfully',
     delete_user_confirm: 'Are you sure you want to delete user {user}?',
     permission_denied: 'Permission denied',
+    // Audit Log
+    audit_log: 'Operation Log',
+    audit_log_desc: 'History of all user operations',
+    audit_col_time: 'Time',
+    audit_col_user: 'User',
+    audit_col_role: 'Role',
+    audit_col_action: 'Action',
+    audit_col_target: 'Target',
+    audit_col_detail: 'Detail',
+    audit_col_result: 'Result',
+    audit_result_success: 'Success',
+    audit_result_failed: 'Failed',
+    audit_action_login: 'Login',
+    audit_action_start: 'Start',
+    audit_action_stop: 'Stop',
+    audit_action_restart: 'Restart',
+    audit_action_upload: 'Upload',
+    audit_action_rollback: 'Rollback',
+    audit_action_create_user: 'Create User',
+    audit_action_update_user: 'Update User',
+    audit_action_delete_user: 'Delete User',
+    audit_filter_all_actions: 'All Actions',
+    audit_total: '{count} records',
+    audit_own_only: 'Showing own records only',
+    audit_empty: 'No operation records',
+    audit_prev: 'Previous',
+    audit_next: 'Next',
+    role_admin: 'Admin',
+    role_operator: 'Operator',
+    role_readonly: 'Read-only',
+    role_unknown: 'Unknown',
   }
 }
 
@@ -2983,6 +3188,51 @@ const doResetPassword = async () => {
   } catch (e) {
     showNotification(e.message, 'error')
   }
+}
+
+// ---- Audit Log Functions ----
+const loadAuditLogs = async () => {
+  auditLoading.value = true
+  try {
+    const params = new URLSearchParams({ limit: auditLimit.value, offset: auditOffset.value })
+    const response = await authorizedFetch(`/api/audit-logs?${params}`)
+    if (response.ok) {
+      const data = await response.json()
+      auditLogs.value = data.logs || []
+      auditTotal.value = data.total || 0
+    }
+  } catch (e) {
+    console.error('Load audit logs error:', e)
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+const filteredAuditLogs = computed(() => {
+  if (!auditFilter.action) return auditLogs.value
+  return auditLogs.value.filter(e => e.action === auditFilter.action)
+})
+
+const formatAuditTime = (ts) => {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const auditActionClass = (action) => {
+  const map = {
+    login: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+    start: 'bg-green-500/15 text-green-600 dark:text-green-400',
+    stop: 'bg-red-500/15 text-red-600 dark:text-red-400',
+    restart: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+    upload: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
+    rollback: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
+    create_user: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
+    update_user: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
+    delete_user: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  }
+  return map[action] || 'bg-gray-500/15 text-gray-600 dark:text-gray-400'
 }
 
 const formattedTimestamp = computed(() => {
