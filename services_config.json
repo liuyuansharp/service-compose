@@ -1,57 +1,128 @@
 {
   "platform": {
-    "cmd": "/path/to/script/platform/start.sh",
-    "args": ["--config", "/path/to/platform/config.json"],
+    "cmd": "./examples/dummy_service.sh",
+    "args": [
+      "platform",
+      "1000"
+    ],
     "log": "platform.log",
     "pidfile": "platform.pid",
     "restart_on_exit": true,
-    "heartbeat": "http://127.0.0.1:9000/heartbeat"
+    "heartbeat": "mock"
   },
   "services": [
     {
       "name": "service_A",
-      "cmd": "/path/to/service_A/start.sh",
-      "args": ["--config", "/path/to/service_A/config.json"],
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_A",
+        "1000"
+      ],
       "log": "service_A.log",
       "pidfile": "service_A.pid",
       "restart_on_exit": true,
-      "heartbeat": "http://127.0.0.1:9001/heartbeat"
+      "heartbeat": "mock",
+      "scheduled_restart": {
+        "enabled": true,
+        "cron": "03:00@0,1",
+        "last_restart": "2026-02-09T21:07:07.487836"
+      }
     },
     {
       "name": "service_B",
-      "cmd": "/path/to/service_B/start.sh",
-      "args": ["--config", "/path/to/service_B/config.json"],
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_B",
+        "1000"
+      ],
       "log": "service_B.log",
       "pidfile": "service_B.pid",
       "restart_on_exit": true,
-      "heartbeat": "http://127.0.0.1:9002/heartbeat"
+      "heartbeat": "mock"
     },
     {
       "name": "service_C",
-      "cmd": "/path/to/service_C/start.sh",
-      "args": ["--config", "/path/to/service_C/config.json"],
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_C",
+        "1000"
+      ],
       "log": "service_C.log",
       "pidfile": "service_C.pid",
       "restart_on_exit": true,
-      "heartbeat": "http://127.0.0.1:9003/heartbeat"
+      "heartbeat": "mock"
     },
     {
       "name": "service_D",
-      "cmd": "/path/to/service_D/start.sh",
-      "args": ["--config", "/path/to/service_D/config.json"],
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_D",
+        "1000"
+      ],
       "log": "service_D.log",
       "pidfile": "service_D.pid",
       "restart_on_exit": true,
-      "heartbeat": "http://127.0.0.1:9004/heartbeat"
+      "heartbeat": "mock"
     },
     {
       "name": "service_E",
-      "cmd": "/path/to/service_E/start.sh",
-      "args": ["--config", "/path/to/service_E/config.json"],
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_E",
+        "1000"
+      ],
       "log": "service_E.log",
       "pidfile": "service_E.pid",
       "restart_on_exit": true,
-      "heartbeat": "http://127.0.0.1:9005/heartbeat"
+      "heartbeat": "mock"
+    },
+    {
+      "name": "service_F",
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_F",
+        "1000"
+      ],
+      "log": "service_F.log",
+      "pidfile": "service_F.pid",
+      "restart_on_exit": true,
+      "heartbeat": "mock"
+    },
+    {
+      "name": "service_G",
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_G",
+        "1000"
+      ],
+      "log": "service_G.log",
+      "pidfile": "service_G.pid",
+      "restart_on_exit": true,
+      "heartbeat": "mock"
+    },
+    {
+      "name": "service_H",
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_H",
+        "1000"
+      ],
+      "log": "service_H.log",
+      "pidfile": "service_H.pid",
+      "restart_on_exit": true,
+      "heartbeat": "mock"
+    },
+    {
+      "name": "service_I",
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_I",
+        "1000"
+      ],
+      "log": "service_I.log",
+      "pidfile": "service_I.pid",
+      "restart_on_exit": true,
+      "heartbeat": "mock"
     }
   ]
 }

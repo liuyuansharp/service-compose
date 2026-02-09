@@ -3,7 +3,7 @@
     "cmd": "./examples/dummy_service.sh",
     "args": [
       "platform",
-      "60"
+      "1000"
     ],
     "log": "platform.log",
     "pidfile": "platform.pid",
@@ -16,7 +16,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_A",
-        "45"
+        "1000"
       ],
       "log": "service_A.log",
       "pidfile": "service_A.pid",
@@ -33,19 +33,19 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_B",
-        "50"
+        "1000"
       ],
       "log": "service_B.log",
       "pidfile": "service_B.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock://fail"
+      "heartbeat": "mock"
     },
     {
       "name": "service_C",
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_C",
-        "50"
+        "1000"
       ],
       "log": "service_C.log",
       "pidfile": "service_C.pid",
@@ -57,7 +57,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_D",
-        "50"
+        "1000"
       ],
       "log": "service_D.log",
       "pidfile": "service_D.pid",
@@ -69,7 +69,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_E",
-        "50"
+        "1000"
       ],
       "log": "service_E.log",
       "pidfile": "service_E.pid",
@@ -81,7 +81,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_F",
-        "50"
+        "1000"
       ],
       "log": "service_F.log",
       "pidfile": "service_F.pid",
@@ -93,7 +93,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_G",
-        "50"
+        "1000"
       ],
       "log": "service_G.log",
       "pidfile": "service_G.pid",
@@ -105,7 +105,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_H",
-        "50"
+        "1000"
       ],
       "log": "service_H.log",
       "pidfile": "service_H.pid",
@@ -117,7 +117,7 @@
       "cmd": "./examples/dummy_service.sh",
       "args": [
         "service_I",
-        "50"
+        "1000"
       ],
       "log": "service_I.log",
       "pidfile": "service_I.pid",
