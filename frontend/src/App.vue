@@ -2349,11 +2349,36 @@ const buildWsUrl = (path) => {
 // 点击分级按钮时自动发起分级搜索
 const onLogLevelClick = (level) => {
   logLevelFilter.value = level
-  if (['ERROR', 'WARNING', 'DEBUG'].includes(level)) {
-    // 自动发起分级搜索
+  if (["ERROR", "WARNING", "DEBUG"].includes(level)) {
+    // 直接设置过滤器，不触发搜索API，而是让filteredDisplayedLogs过滤当前logs
+    logSearch.value = ''  // 清空搜索，避免冲突
+    // 不暂停WebSocket，保持实时更新
+    // 自动发起分级搜索并暂停实时推送
     logSearch.value = level
+    if (!logPaused.value) {
+      logPaused.value = true
+      if (logSocket && logSocket.readyState === 1) {
+        logSocket.send(JSON.stringify({ action: 'pause' }))
+      }
+    }
+  } else if (level === "INFO") {
+    // 切换到INFO时清空搜索内容，恢复实时，仅显示当前实时流的INFO内容
+    logSearch.value = ''
+    if (logPaused.value) {
+      logPaused.value = false
+      if (logSocket && logSocket.readyState === 1) {
+        logSocket.send(JSON.stringify({ action: 'resume' }))
+      }
+    }
+    // logs.value[service] 不变，filteredDisplayedLogs 会自动只显示 INFO
   } else if (level === 'ALL') {
     logSearch.value = ''
+    if (logPaused.value) {
+      logPaused.value = false
+      if (logSocket && logSocket.readyState === 1) {
+        logSocket.send(JSON.stringify({ action: 'resume' }))
+      }
+    }
   }
 }
 
