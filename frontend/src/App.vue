@@ -3011,8 +3011,16 @@ const connectLogWebSocket = (service) => {
   logSocket.onmessage = (event) => {
     const data = JSON.parse(event.data)
     if (data.type === 'log') {
+      // Assign a sequential line number for display
+      const meta = logsMeta.value[service]
+      const currentTotal = meta ? meta.total : (logs.value[service]?.length || 0)
+      data.line = currentTotal + 1
       logs.value[service] = [...(logs.value[service] || []), data]
-      if (logsMeta.value[service]) logsMeta.value[service].total += 1
+      if (logsMeta.value[service]) {
+        logsMeta.value[service].total = currentTotal + 1
+      } else {
+        logsMeta.value[service] = { total: currentTotal + 1, offset: 0 }
+      }
       nextTick(scrollLogsToBottom)
     }
   }
@@ -5209,7 +5217,7 @@ const clearLogs = () => {
     onConfirm: () => {
       const service = selectedService.value
       logs.value[service] = []
-      logsMeta.value[service] = null
+      logsMeta.value[service] = { total: 0, offset: 0 }
       searchMatches.value[service] = []
       currentMatchIndex.value[service] = -1
       logHasMorePrev.value[service] = false
