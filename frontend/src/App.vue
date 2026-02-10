@@ -2144,23 +2144,71 @@
                   {{ confirmDialog.detail }}
                 </div>
 
-                <!-- Services list preview (only affected services) -->
-                <div v-if="(confirmDialog.type === 'start' || confirmDialog.type === 'stop') && batchTargetServices.length > 0" class="mt-4 max-h-32 overflow-y-auto">
-                  <div class="flex flex-wrap gap-1.5 justify-center">
-                    <span
+                <!-- Services list preview (interactive selection) -->
+                <div v-if="(confirmDialog.type === 'start' || confirmDialog.type === 'stop') && batchTargetServices.length > 0" class="mt-4">
+                  <!-- Select all / deselect all header -->
+                  <div class="flex items-center justify-between mb-2 px-1">
+                    <button
+                      @click="toggleBatchSelectAll"
+                      class="inline-flex items-center gap-1.5 text-[11px] font-medium transition rounded px-1.5 py-0.5"
+                      :class="batchAllSelected
+                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        : (confirmDialog.type === 'start'
+                          ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300'
+                          : 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300')"
+                    >
+                      <!-- Checkbox icon -->
+                      <svg v-if="batchAllSelected" viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12l2 2 4-4"/>
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="3"/>
+                      </svg>
+                      {{ batchAllSelected ? t('batch_deselect_all') : t('batch_select_all') }}
+                    </button>
+                    <span class="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
+                      {{ batchSelectedServices.size }}/{{ batchTargetServices.length }}
+                    </span>
+                  </div>
+                  <!-- Service items -->
+                  <div class="max-h-40 overflow-y-auto rounded-lg border border-gray-200/60 dark:border-gray-700/40 divide-y divide-gray-100 dark:divide-gray-800/50">
+                    <button
                       v-for="s in batchTargetServices"
                       :key="s.name"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono border"
-                      :class="confirmDialog.type === 'start'
-                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
-                        : 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'"
+                      @click="toggleBatchService(s.name)"
+                      class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors group"
+                      :class="batchSelectedServices.has(s.name)
+                        ? (confirmDialog.type === 'start'
+                          ? 'bg-emerald-50/60 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                          : 'bg-red-50/60 dark:bg-red-500/5 hover:bg-red-50 dark:hover:bg-red-500/10')
+                        : 'bg-white dark:bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/30'"
                     >
+                      <!-- Custom checkbox -->
+                      <span
+                        class="flex-shrink-0 h-4 w-4 rounded border-[1.5px] flex items-center justify-center transition-all"
+                        :class="batchSelectedServices.has(s.name)
+                          ? (confirmDialog.type === 'start'
+                            ? 'bg-emerald-500 border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600'
+                            : 'bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600')
+                          : 'border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500'"
+                      >
+                        <svg v-if="batchSelectedServices.has(s.name)" viewBox="0 0 24 24" class="h-3 w-3 text-white" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      </span>
+                      <!-- Status dot -->
                       <span
                         class="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                        :class="confirmDialog.type === 'start' ? 'bg-amber-500' : 'bg-green-500'"
+                        :class="confirmDialog.type === 'start' ? 'bg-amber-400' : 'bg-green-500'"
                       ></span>
-                      {{ s.name }}
-                    </span>
+                      <!-- Service name -->
+                      <span
+                        class="text-xs font-mono truncate"
+                        :class="batchSelectedServices.has(s.name)
+                          ? 'text-gray-800 dark:text-gray-200'
+                          : 'text-gray-400 dark:text-gray-500 line-through'"
+                      >{{ s.name }}</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2175,7 +2223,8 @@
                 </button>
                 <button
                   @click="closeConfirmDialog(true)"
-                  class="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2 inline-flex items-center justify-center gap-2"
+                  :disabled="(confirmDialog.type === 'start' || confirmDialog.type === 'stop') && batchNoneSelected"
+                  class="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                   :class="{
                     'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500': confirmDialog.type === 'start',
                     'bg-red-600 hover:bg-red-700 focus:ring-red-500': confirmDialog.type === 'stop' || confirmDialog.type === 'danger',
@@ -2463,6 +2512,8 @@ const translations = {
     batch_confirm_detail: '将操作 {count}/{total} 个服务',
     batch_no_start_targets: '所有服务均已在运行中，无需启动',
     batch_no_stop_targets: '所有服务均已停止，无需停止',
+    batch_select_all: '全选',
+    batch_deselect_all: '取消全选',
     confirm_yes: '确认',
     confirm_no: '取消',
     batch_action_success: '批量{action}操作已执行',
@@ -2746,6 +2797,8 @@ const translations = {
     batch_confirm_detail: 'Will affect {count}/{total} services',
     batch_no_start_targets: 'All services are already running',
     batch_no_stop_targets: 'All services are already stopped',
+    batch_select_all: 'Select All',
+    batch_deselect_all: 'Deselect All',
     confirm_yes: 'Confirm',
     confirm_no: 'Cancel',
     batch_action_success: 'Batch {action} executed successfully',
@@ -3670,6 +3723,8 @@ const noServicesRunning = computed(() => {
 
 // Filtered services for batch confirm dialog preview
 const batchTargetServices = ref([])
+// User-selected services in batch confirm dialog (names set)
+const batchSelectedServices = ref(new Set())
 
 const batchControlAll = async (action) => {
   const isStart = action === 'start'
@@ -3683,21 +3738,58 @@ const batchControlAll = async (action) => {
     return
   }
   batchTargetServices.value = filtered
-  const count = filtered.length
+  // Default: all filtered services are selected
+  batchSelectedServices.value = new Set(filtered.map(s => s.name))
   openConfirmDialog({
     type: isStart ? 'start' : 'stop',
     title: t(isStart ? 'batch_start_all' : 'batch_stop_all'),
     message: t(isStart ? 'batch_start_confirm' : 'batch_stop_confirm'),
-    detail: t('batch_confirm_detail', { count, total: visibleServices.value.length }),
+    detail: t('batch_confirm_detail', { count: filtered.length, total: visibleServices.value.length }),
     confirmText: t(isStart ? 'batch_start_all' : 'batch_stop_all'),
     onConfirm: () => executeBatchControl(action),
   })
 }
 
+// Toggle a service in/out of batch selection
+const toggleBatchService = (name) => {
+  const s = new Set(batchSelectedServices.value)
+  if (s.has(name)) {
+    s.delete(name)
+  } else {
+    s.add(name)
+  }
+  batchSelectedServices.value = s
+  // Update detail text dynamically
+  if (confirmDialog.value.show) {
+    confirmDialog.value.detail = t('batch_confirm_detail', { count: s.size, total: visibleServices.value.length })
+  }
+}
+
+// Select all / deselect all in batch dialog
+const toggleBatchSelectAll = () => {
+  if (batchSelectedServices.value.size === batchTargetServices.value.length) {
+    batchSelectedServices.value = new Set()
+  } else {
+    batchSelectedServices.value = new Set(batchTargetServices.value.map(s => s.name))
+  }
+  if (confirmDialog.value.show) {
+    confirmDialog.value.detail = t('batch_confirm_detail', { count: batchSelectedServices.value.size, total: visibleServices.value.length })
+  }
+}
+
+const batchAllSelected = computed(() => {
+  return batchTargetServices.value.length > 0 && batchSelectedServices.value.size === batchTargetServices.value.length
+})
+
+const batchNoneSelected = computed(() => {
+  return batchSelectedServices.value.size === 0
+})
+
 const executeBatchControl = async (action) => {
   controlling.value = true
   try {
-    const targets = batchTargetServices.value.map(s => s.name)
+    // Only operate on user-selected services
+    const targets = [...batchSelectedServices.value]
     const results = await Promise.allSettled(
       targets.map(name =>
         authorizedFetch('/api/control', {
