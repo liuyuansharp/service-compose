@@ -1807,6 +1807,8 @@
             <option value="create_user">{{ t('audit_action_create_user') }}</option>
             <option value="update_user">{{ t('audit_action_update_user') }}</option>
             <option value="delete_user">{{ t('audit_action_delete_user') }}</option>
+            <option value="batch_start">{{ t('audit_action_batch_start') }}</option>
+            <option value="batch_stop">{{ t('audit_action_batch_stop') }}</option>
           </select>
           <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('audit_total', { count: auditTotal }) }}</span>
           <span v-if="!isAdmin" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ t('audit_own_only') }}</span>
@@ -2625,6 +2627,8 @@ const translations = {
     audit_action_create_user: '创建用户',
     audit_action_update_user: '更新用户',
     audit_action_delete_user: '删除用户',
+    audit_action_batch_start: '批量启动',
+    audit_action_batch_stop: '批量停止',
     audit_filter_all_actions: '全部操作',
     audit_total: '共 {count} 条',
     audit_own_only: '仅显示本人操作',
@@ -2915,6 +2919,8 @@ const translations = {
     audit_action_create_user: 'Create User',
     audit_action_update_user: 'Update User',
     audit_action_delete_user: 'Delete User',
+    audit_action_batch_start: 'Batch Start',
+    audit_action_batch_stop: 'Batch Stop',
     audit_filter_all_actions: 'All Actions',
     audit_total: '{count} records',
     audit_own_only: 'Showing own records only',
