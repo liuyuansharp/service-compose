@@ -2518,6 +2518,9 @@ const translations = {
     confirm_no: '取消',
     batch_action_success: '批量{action}操作已执行',
     batch_action_failed: '批量{action}操作失败',
+    batch_result_failed: '个失败',
+    batch_result_skipped: '个被跳过(操作中)',
+    service_busy: '该服务正在被其他用户操作，请稍后再试',
     role_admin: '管理员',
     role_operator: '操作员',
     role_readonly: '只读',
@@ -2803,6 +2806,9 @@ const translations = {
     confirm_no: 'Cancel',
     batch_action_success: 'Batch {action} executed successfully',
     batch_action_failed: 'Batch {action} failed',
+    batch_result_failed: 'failed',
+    batch_result_skipped: 'skipped (busy)',
+    service_busy: 'Service is being operated by another user, please try again later',
     role_admin: 'Admin',
     role_operator: 'Operator',
     role_readonly: 'Read-only',
@@ -3788,22 +3794,26 @@ const batchNoneSelected = computed(() => {
 const executeBatchControl = async (action) => {
   controlling.value = true
   try {
-    // Only operate on user-selected services
+    // Only operate on user-selected services — use batch endpoint (single HTTP call)
     const targets = [...batchSelectedServices.value]
-    const results = await Promise.allSettled(
-      targets.map(name =>
-        authorizedFetch('/api/control', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, service: name })
-        })
-      )
-    )
-    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok))
-    if (failed.length === 0) {
+    const response = await authorizedFetch('/api/batch-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, services: targets })
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || `Batch ${action} failed`)
+    }
+    const data = await response.json()
+    const { succeeded = 0, failed = 0, skipped = 0 } = data
+    if (failed === 0 && skipped === 0) {
       showNotification(t('batch_action_success', { action: t(action) }), 'success')
-    } else if (failed.length < targets.length) {
-      showNotification(t('batch_action_success', { action: t(action) }) + ` (${failed.length} failed)`, 'warning')
+    } else if (succeeded > 0) {
+      const parts = []
+      if (failed > 0) parts.push(`${failed} ${t('batch_result_failed')}`)
+      if (skipped > 0) parts.push(`${skipped} ${t('batch_result_skipped')}`)
+      showNotification(t('batch_action_success', { action: t(action) }) + ` (${parts.join(', ')})`, 'warning')
     } else {
       showNotification(t('batch_action_failed', { action: t(action) }), 'error')
     }
@@ -3811,7 +3821,7 @@ const executeBatchControl = async (action) => {
     schedulePostControlRefresh()
   } catch (error) {
     console.error('Batch control error:', error)
-    showNotification(t('batch_action_failed', { action: t(action) }), 'error')
+    showNotification(error.message || t('batch_action_failed', { action: t(action) }), 'error')
   } finally {
     controlling.value = false
   }
@@ -5131,7 +5141,16 @@ const controlService = async (action, service) => {
       body: JSON.stringify({ action, service })
     })
     
-    if (!response.ok) throw new Error(`Failed to ${action} service`)
+    if (response.status === 409) {
+      // Service is being operated by another user
+      const err = await response.json().catch(() => ({}))
+      showNotification(err.detail || t('service_busy'), 'warning')
+      return
+    }
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || `Failed to ${action} service`)
+    }
 
     const data = await response.json()
     const details = formatControlDetails(data)
@@ -5140,7 +5159,7 @@ const controlService = async (action, service) => {
     schedulePostControlRefresh()
   } catch (error) {
     console.error('Control error:', error)
-    showNotification(t('control_failed'), 'error')
+    showNotification(error.message || t('control_failed'), 'error')
   } finally {
     controlling.value = false
   }

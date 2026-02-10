@@ -272,6 +272,11 @@ class ServiceControl(BaseModel):
     service: Optional[str] = None  # None for all, or service name
 
 
+class BatchServiceControl(BaseModel):
+    action: str  # "start", "stop", "restart"
+    services: List[str]  # list of service names
+
+
 class SystemMetrics(BaseModel):
     cpu_percent: float  # CPU 使用率 (0-100)
     cpu_count: int  # CPU 核心数
@@ -1268,6 +1273,18 @@ def _do_scheduled_restart(service_name: str):
 import threading
 _audit_lock = threading.Lock()
 
+# ==================== Per-service control locks ====================
+# Prevents concurrent conflicting operations on the same service (multi-user safety)
+_service_locks: Dict[str, asyncio.Lock] = {}
+_service_locks_meta_lock = asyncio.Lock()
+
+async def _get_service_lock(service_name: str) -> asyncio.Lock:
+    """Get or create an asyncio.Lock for a specific service."""
+    async with _service_locks_meta_lock:
+        if service_name not in _service_locks:
+            _service_locks[service_name] = asyncio.Lock()
+        return _service_locks[service_name]
+
 
 def append_audit_log(user: str, role: str, action: str, target: str = "", detail: str = "", result: str = "success"):
     """Append an entry to the audit log JSON file."""
@@ -1948,88 +1965,183 @@ async def dashboard_sse(request: Request, token: Optional[str] = Query(None)):
             await asyncio.sleep(2)
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-@app.post("/api/control")
-async def control_service(control: ServiceControl, current_user: dict = Depends(get_current_user)):
-    """Control service (start/stop/restart). Requires operator or admin role."""
-    require_operator(current_user)
-    try:
-        logger.info(f"Control action: {control.action}")
-        
-        # Build command
-        cmd = [
-            sys.executable,
-            str(SERVICE_DIR / 'manage_services.py'),
-            control.action
-        ]
+async def _run_service_command(action: str, service: Optional[str], timeout: float = 30) -> dict:
+    """Execute a single service control command asynchronously. Non-blocking for the event loop."""
+    cmd = [
+        sys.executable,
+        str(SERVICE_DIR / 'manage_services.py'),
+        action
+    ]
 
-        # 支持独立控制：平台服务 / 单个服务 / 全部
-        if control.service:
-            if control.service == 'platform':
-                cmd.append('--platform')
-                if control.action in ("start", "restart"):
-                    cmd.append('--daemon')
-            else:
-                cmd.extend(['--service', control.service])
-                if control.action in ("start", "restart"):
-                    cmd.append('--daemon')
-        else:
-            # 全部服务：start/restart 也需要 daemon 以免阻塞
-            if control.action in ("start", "restart"):
+    # 支持独立控制：平台服务 / 单个服务 / 全部
+    if service:
+        if service == 'platform':
+            cmd.append('--platform')
+            if action in ("start", "restart"):
                 cmd.append('--daemon')
-        
-        # Execute command
-        if "--daemon" in cmd:
-            # Daemonized start/restart should not block API request
-            subprocess.Popen(
-                cmd,
-                cwd=str(SERVICE_DIR),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            result = subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
         else:
-            result = subprocess.run(
-                cmd,
-                cwd=str(SERVICE_DIR),
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-        
-        if result.returncode != 0:
-            logger.error(f"Command failed: {result.stderr}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to {control.action} services: {result.stderr}"
-            )
-        
-        logger.info(f"Successfully executed '{control.action}'")
-        append_audit_log(
-            user=current_user["username"],
-            role=current_user.get("role", "admin"),
-            action=control.action,
-            target=control.service or "all",
+            cmd.extend(['--service', service])
+            if action in ("start", "restart"):
+                cmd.append('--daemon')
+    else:
+        if action in ("start", "restart"):
+            cmd.append('--daemon')
+
+    is_daemon = "--daemon" in cmd
+
+    if is_daemon:
+        # Daemonized: fire-and-forget, no blocking
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(SERVICE_DIR),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        # Don't await completion for daemon — just let it go
         return {
             "status": "success",
-            "action": control.action,
-            "message": f"Successfully executed '{control.action}'",
+            "action": action,
+            "service": service or "all",
+            "message": f"Successfully executed '{action}'",
             "command": " ".join(cmd),
-            "output": result.stdout,
-            "stderr": result.stderr,
-            "daemon": "--daemon" in cmd
+            "output": "",
+            "stderr": "",
+            "daemon": True,
         }
-    except subprocess.TimeoutExpired:
-        logger.error("Command timeout")
-        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail="timeout")
-        raise HTTPException(status_code=500, detail="Command timeout")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Control error: {e}")
-        append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Non-daemon (stop): run with timeout, non-blocking via asyncio subprocess
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(SERVICE_DIR),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise HTTPException(status_code=500, detail=f"Command timeout after {timeout}s for {service or 'all'}")
+
+        stdout_str = stdout.decode(errors='replace') if stdout else ""
+        stderr_str = stderr.decode(errors='replace') if stderr else ""
+
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to {action} {service or 'services'}: {stderr_str}"
+            )
+
+        return {
+            "status": "success",
+            "action": action,
+            "service": service or "all",
+            "message": f"Successfully executed '{action}'",
+            "command": " ".join(cmd),
+            "output": stdout_str,
+            "stderr": stderr_str,
+            "daemon": False,
+        }
+
+
+@app.post("/api/control")
+async def control_service(control: ServiceControl, current_user: dict = Depends(get_current_user)):
+    """Control service (start/stop/restart). Requires operator or admin role.
+       Uses per-service async lock to prevent concurrent conflicting operations."""
+    require_operator(current_user)
+    service_key = control.service or "__all__"
+    lock = await _get_service_lock(service_key)
+
+    # Try to acquire lock; if already locked, return 409 Conflict immediately
+    if lock.locked():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Service '{control.service or 'all'}' is already being operated on by another user. Please wait."
+        )
+
+    async with lock:
+        try:
+            logger.info(f"Control action: {control.action} service={control.service} user={current_user['username']}")
+            result = await _run_service_command(control.action, control.service)
+            logger.info(f"Successfully executed '{control.action}' for {control.service or 'all'}")
+            append_audit_log(
+                user=current_user["username"],
+                role=current_user.get("role", "admin"),
+                action=control.action,
+                target=control.service or "all",
+            )
+            return result
+        except HTTPException:
+            append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail="error")
+            raise
+        except Exception as e:
+            logger.error(f"Control error: {e}")
+            append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/batch-control")
+async def batch_control_services(batch: BatchServiceControl, current_user: dict = Depends(get_current_user)):
+    """Batch control multiple services concurrently. Each service runs in parallel with its own lock.
+       Returns per-service results. Does not block the event loop."""
+    require_operator(current_user)
+
+    if not batch.services:
+        raise HTTPException(status_code=400, detail="No services specified")
+
+    if len(batch.services) > 50:
+        raise HTTPException(status_code=400, detail="Too many services (max 50)")
+
+    logger.info(f"Batch {batch.action}: {batch.services} by user={current_user['username']}")
+
+    async def _control_one(service_name: str) -> dict:
+        """Control a single service with its lock. Returns result dict."""
+        lock = await _get_service_lock(service_name)
+        if lock.locked():
+            return {
+                "service": service_name,
+                "status": "skipped",
+                "message": f"Service '{service_name}' is being operated by another user",
+            }
+        async with lock:
+            try:
+                result = await _run_service_command(batch.action, service_name)
+                append_audit_log(
+                    user=current_user["username"],
+                    role=current_user.get("role", "admin"),
+                    action=batch.action,
+                    target=service_name,
+                )
+                return result
+            except HTTPException as he:
+                return {"service": service_name, "status": "failed", "message": he.detail}
+            except Exception as e:
+                return {"service": service_name, "status": "failed", "message": str(e)}
+
+    # Run all service controls concurrently
+    results = await asyncio.gather(*[_control_one(s) for s in batch.services])
+
+    succeeded = sum(1 for r in results if r.get("status") == "success")
+    skipped = sum(1 for r in results if r.get("status") == "skipped")
+    failed = sum(1 for r in results if r.get("status") == "failed")
+
+    append_audit_log(
+        user=current_user["username"],
+        role=current_user.get("role", "admin"),
+        action=f"batch_{batch.action}",
+        target=",".join(batch.services),
+        detail=f"ok={succeeded} skipped={skipped} failed={failed}",
+    )
+
+    return {
+        "status": "success" if failed == 0 else ("partial" if succeeded > 0 else "failed"),
+        "action": batch.action,
+        "total": len(batch.services),
+        "succeeded": succeeded,
+        "skipped": skipped,
+        "failed": failed,
+        "results": results,
+    }
 
 
 @app.get("/api/logs")
