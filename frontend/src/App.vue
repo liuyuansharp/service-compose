@@ -5212,6 +5212,8 @@ const clearLogs = () => {
       logsMeta.value[service] = null
       searchMatches.value[service] = []
       currentMatchIndex.value[service] = -1
+      logHasMorePrev.value[service] = false
+      logHasMoreNext.value[service] = false
       logLevelFilter.value = 'ALL'
       // 通知后端WebSocket将文件指针移到末尾，后续只接收新日志
       if (logSocket && logSocket.readyState === 1) {

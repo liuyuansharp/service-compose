@@ -82,8 +82,9 @@ UPDATE_TASKS: Dict[str, Dict] = {}
 MAX_LOG_LINES = 500
 MAX_LOG_SEARCH_LINES = 5000
 MAX_METRICS_HISTORY_POINTS = 2000
-MAX_LOG_BYTES = 50 * 1024 * 1024
-MAX_LOG_BACKUPS = 10
+MAX_LOG_BYTES = 10 * 1024 * 1024       # Single log file max size (10MB, matches RotatingFileHandler)
+MAX_LOG_BACKUPS = 3                     # Max backup files per service (.log.1, .log.2, .log.3)
+MAX_TOTAL_LOG_BYTES = 500 * 1024 * 1024 # Total log directory size limit (500MB)
 LOG_INDEX_STRIDE = 1000
 LOG_INDEX_CACHE: Dict[str, Dict] = {}
 
@@ -538,6 +539,7 @@ async def _log_maintenance():
         try:
             for log_file in LOGS_DIR.glob("*.log"):
                 _rotate_log_if_needed(log_file)
+            _enforce_total_log_size()
         except Exception as exc:
             logger.warning(f"Log maintenance error: {exc}")
         await asyncio.sleep(300)
@@ -891,21 +893,75 @@ def _downsample_points(points: List[Dict], step_seconds: int) -> List[Dict]:
 
 
 def _rotate_log_if_needed(log_file: Path):
+    """Enforce per-file rotation and backup limits.
+    
+    RotatingFileHandler in manage_services.py creates .log.1, .log.2, etc.
+    This function enforces MAX_LOG_BACKUPS by deleting excess older backups,
+    and enforces MAX_LOG_BYTES on the main .log file if manage_services isn't handling it.
+    """
     try:
         if not log_file.exists():
             return
-        if log_file.stat().st_size <= MAX_LOG_BYTES:
-            return
-        stamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        rotated = log_file.with_name(f"{log_file.stem}.{stamp}{log_file.suffix}")
-        shutil.move(str(log_file), str(rotated))
-        log_file.touch()
-        backups = sorted(log_file.parent.glob(f"{log_file.stem}.*{log_file.suffix}"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+        # Enforce backup count: .log.1, .log.2, ... keep only MAX_LOG_BACKUPS
+        base = log_file.name  # e.g. "service_A.log"
+        backups = sorted(
+            [f for f in log_file.parent.iterdir()
+             if f.name.startswith(base + ".") and f.name[len(base)+1:].isdigit()],
+            key=lambda p: int(p.name[len(base)+1:])
+        )
         for old in backups[MAX_LOG_BACKUPS:]:
             old.unlink(missing_ok=True)
-        LOG_INDEX_CACHE.pop(str(log_file), None)
+            logger.debug(f"Removed excess log backup: {old.name}")
+
+        # If main log exceeds limit (fallback for non-RotatingFileHandler logs)
+        if log_file.stat().st_size > MAX_LOG_BYTES:
+            # Shift existing backups: .2 → .3, .1 → .2, etc.
+            for i in range(MAX_LOG_BACKUPS, 0, -1):
+                src = log_file.parent / f"{base}.{i}"
+                dst = log_file.parent / f"{base}.{i + 1}"
+                if src.exists():
+                    if i >= MAX_LOG_BACKUPS:
+                        src.unlink(missing_ok=True)
+                    else:
+                        shutil.move(str(src), str(dst))
+            # Rotate current → .1
+            shutil.move(str(log_file), str(log_file.parent / f"{base}.1"))
+            log_file.touch()
+            LOG_INDEX_CACHE.pop(str(log_file), None)
     except Exception as exc:
         logger.warning(f"Log rotate failed for {log_file}: {exc}")
+
+
+def _enforce_total_log_size():
+    """Enforce total log directory size limit by removing oldest backup files."""
+    try:
+        # Collect all log files (main + backups), sorted by mtime (oldest first)
+        all_log_files = sorted(
+            [f for f in LOGS_DIR.iterdir() if f.is_file() and '.log' in f.name and not f.name.endswith('.idx')],
+            key=lambda p: p.stat().st_mtime
+        )
+        total = sum(f.stat().st_size for f in all_log_files)
+        
+        if total <= MAX_TOTAL_LOG_BYTES:
+            return
+        
+        logger.info(f"Total log size {total // (1024*1024)}MB exceeds limit {MAX_TOTAL_LOG_BYTES // (1024*1024)}MB, cleaning up...")
+        
+        for f in all_log_files:
+            if total <= MAX_TOTAL_LOG_BYTES:
+                break
+            # Only delete backup files (.log.N), never delete main .log files
+            if f.suffix.lstrip('.').isdigit() or (f.name.count('.') >= 2 and f.name.split('.')[-1].isdigit()):
+                fsize = f.stat().st_size
+                f.unlink(missing_ok=True)
+                # Also remove the index cache
+                base_log = f.parent / f.name.rsplit('.', 1)[0]
+                LOG_INDEX_CACHE.pop(str(base_log), None)
+                total -= fsize
+                logger.info(f"Removed old log backup: {f.name} ({fsize // 1024}KB)")
+    except Exception as exc:
+        logger.warning(f"Total log size enforcement error: {exc}")
 
 
 def _load_log_index(log_file: Path) -> Dict:
@@ -953,6 +1009,91 @@ def _load_log_index(log_file: Path) -> Dict:
         pass
     LOG_INDEX_CACHE[key] = data
     return data
+
+
+def _get_log_chain(service: str) -> List[Path]:
+    """Get ordered list of log files for a service: oldest backup → ... → current.
+    
+    e.g. [service_A.log.3, service_A.log.2, service_A.log.1, service_A.log]
+    """
+    base = LOGS_DIR / f"{service}.log"
+    chain = []
+    
+    # Collect backup files (.log.N) sorted by N descending (oldest first)
+    backups = []
+    for f in LOGS_DIR.iterdir():
+        name = f.name
+        prefix = f"{service}.log."
+        if name.startswith(prefix) and not name.endswith('.idx'):
+            suffix = name[len(prefix):]
+            if suffix.isdigit():
+                backups.append((int(suffix), f))
+    backups.sort(key=lambda x: x[0], reverse=True)  # highest number = oldest
+    
+    for _, f in backups:
+        if f.exists():
+            chain.append(f)
+    
+    if base.exists():
+        chain.append(base)
+    
+    return chain
+
+
+def _get_chained_total_lines(chain: List[Path]) -> Tuple[int, List[Tuple[Path, int]]]:
+    """Get total lines across all chained log files.
+    
+    Returns (total_lines, [(file, file_total_lines), ...])
+    """
+    total = 0
+    file_lines = []
+    for f in chain:
+        idx = _load_log_index(f)
+        n = idx.get("total_lines", 0)
+        file_lines.append((f, n))
+        total += n
+    return total, file_lines
+
+
+def _read_chained_log_lines(chain: List[Path], start_line: int, max_lines: int) -> Tuple[List[Tuple[int, str]], int]:
+    """Read lines across chained log files with virtual line numbers.
+    
+    The oldest backup is at the beginning; current .log is at the end.
+    Virtual line 0 is the first line of the oldest backup.
+    """
+    total_lines, file_lines = _get_chained_total_lines(chain)
+    if total_lines <= 0:
+        return [], 0
+    
+    if start_line < 0:
+        start_line = max(total_lines + start_line, 0)
+    start_line = min(start_line, total_lines)
+    
+    results: List[Tuple[int, str]] = []
+    cumulative = 0
+    
+    for fpath, flines in file_lines:
+        if len(results) >= max_lines:
+            break
+        
+        file_end = cumulative + flines
+        
+        if file_end <= start_line:
+            # This file is entirely before start_line, skip it
+            cumulative = file_end
+            continue
+        
+        # Calculate where to start reading in this file
+        local_start = max(start_line - cumulative, 0)
+        remaining = max_lines - len(results)
+        
+        file_results, _ = _read_log_lines(fpath, local_start, remaining)
+        for local_idx, line in file_results:
+            results.append((cumulative + local_idx, line))
+        
+        cumulative = file_end
+    
+    return results[:max_lines], total_lines
 
 
 def _read_log_lines(log_file: Path, start_line: int, max_lines: int) -> Tuple[List[Tuple[int, str]], int]:
@@ -2152,11 +2293,12 @@ async def get_logs(
     search: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
 ) -> Dict:
-    """Get log entries for a service."""
+    """Get log entries for a service. Reads across rotated log files (.log.N → .log)."""
     try:
         log_file = LOGS_DIR / f"{service}.log"
+        chain = _get_log_chain(service)
         
-        if not log_file.exists():
+        if not chain:
             return {
                 "service": service,
                 "logs": [],
@@ -2166,17 +2308,23 @@ async def get_logs(
 
         _rotate_log_if_needed(log_file)
         
-        # Read log file (cap search window to avoid large memory usage)
+        # Read log files (chained: all backups + current)
         total_lines = 0
         if search:
+            # For search, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES)
             recent_logs = deque(maxlen=MAX_LOG_SEARCH_LINES)
-            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                for idx, line in enumerate(f):
-                    total_lines = idx + 1
-                    recent_logs.append(line)
+            global_idx = 0
+            for fpath in chain:
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            recent_logs.append((global_idx, line))
+                            global_idx += 1
+                except Exception:
+                    pass
+            total_lines = global_idx
             base_index = max(total_lines - len(recent_logs), 0)
-            all_logs = list(recent_logs)
-            indexed_logs = [(idx + base_index, line) for idx, line in enumerate(all_logs)]
+            indexed_logs = [(idx, line) for idx, line in recent_logs]
         else:
             try:
                 n_lines = int(lines)
@@ -2185,11 +2333,10 @@ async def get_logs(
             if n_lines <= 0:
                 n_lines = MAX_LOG_LINES
             n_lines = min(n_lines, MAX_LOG_LINES)
-            indexed_logs, total_lines = _read_log_lines(log_file, offset, n_lines)
+            indexed_logs, total_lines = _read_chained_log_lines(chain, offset, n_lines)
             indexed_logs = [(idx, line) for idx, line in indexed_logs]
         
-        # Filter by search term，保留原始行号信息
-        # 我们构造一个列表，元素为 (line_index, line_content)，这样即使过滤后也能知道原始行号
+        # Filter by search term
         if search:
             lowered = search.lower()
             filtered_indexed_logs = [
@@ -2199,7 +2346,7 @@ async def get_logs(
         else:
             filtered_indexed_logs = indexed_logs
         
-        # 分段加载：offset为起始行，lines为加载行数
+        # Pagination
         try:
             n_lines = int(lines)
         except Exception:
@@ -2209,13 +2356,10 @@ async def get_logs(
 
         if search:
             filtered_total = len(filtered_indexed_logs)
-            # offset<0 表示从末尾倒数
             if n_lines <= 0 or str(lines).lower() == "all":
                 logs_to_return = filtered_indexed_logs
                 real_offset = 0
             else:
-                # offset为正：从offset开始，取n_lines行
-                # offset为负：从末尾倒数offset行开始，取n_lines行
                 if offset < 0:
                     start = max(filtered_total + offset, 0)
                 else:
@@ -2236,7 +2380,6 @@ async def get_logs(
         for idx, log_line in logs_to_return:
             if log_line.strip():
                 level = extract_log_level(log_line)
-                # 原始行号（1-based）
                 line_number = idx + 1
                 entries.append({
                     "raw": log_line.rstrip(),
@@ -2248,13 +2391,9 @@ async def get_logs(
         return {
             "service": service,
             "logs": entries,
-            # total：原始文件总行数
             "total": total_lines,
-            # displayed：当前返回的有效日志条数
             "displayed": len(entries),
-            # searched：参与本次搜索的行数（无搜索时等于 total）
             "searched": filtered_total if search else total_lines,
-            # offset：在 filtered_indexed_logs 中的起始下标（0-based），用于分页
             "offset": real_offset,
             "has_more_prev": real_offset > 0,
             "has_more_next": real_offset + len(entries) < filtered_total
@@ -2370,17 +2509,39 @@ async def metrics_sse(request: Request, service: str = Query("platform"), token:
 
 @app.get("/api/logs/download")
 async def download_logs(service: str = Query("platform"), current_user: dict = Depends(get_current_user)):
-    """Download logs for a service."""
+    """Download all logs for a service (including rotated backups, merged chronologically)."""
     try:
-        log_file = LOGS_DIR / f"{service}.log"
-        
-        if not log_file.exists():
+        chain = _get_log_chain(service)
+        if not chain:
             raise HTTPException(status_code=404, detail=f"Log file for {service} not found")
         
-        return FileResponse(
-            path=log_file,
-            filename=f"{service}-logs-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log",
-            media_type="text/plain"
+        if len(chain) == 1:
+            # Single file — just download directly
+            return FileResponse(
+                path=chain[0],
+                filename=f"{service}-logs-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log",
+                media_type="text/plain"
+            )
+        
+        # Multiple files — stream merged content
+        async def merged_stream():
+            for fpath in chain:
+                try:
+                    with open(fpath, 'rb') as f:
+                        while True:
+                            chunk = f.read(65536)
+                            if not chunk:
+                                break
+                            yield chunk
+                except Exception:
+                    pass
+        
+        return StreamingResponse(
+            merged_stream(),
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f'attachment; filename="{service}-logs-{datetime.now().strftime("%Y%m%d-%H%M%S")}.log"'
+            }
         )
     except HTTPException:
         raise

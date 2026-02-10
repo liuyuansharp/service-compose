@@ -18,7 +18,7 @@ CONFIG_PATH = ROOT / 'services_config.json'
 LOGS_DIR = ROOT / 'logs'
 
 
-def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=5):
+def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=3):
     """Setup rotating file handler for each service.
     
     Args:
