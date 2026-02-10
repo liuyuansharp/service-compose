@@ -2291,6 +2291,7 @@ async def get_logs(
     lines: str = Query("100"),
     offset: int = Query(0),
     search: Optional[str] = Query(None),
+    level: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
 ) -> Dict:
     """Get log entries for a service. Reads across rotated log files (.log.N → .log)."""
@@ -2310,8 +2311,9 @@ async def get_logs(
         
         # Read log files (chained: all backups + current)
         total_lines = 0
-        if search:
-            # For search, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES if >0)
+        # 读取所有日志（全量/搜索）
+        if search or level:
+            # For search or level, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES if >0)
             if MAX_LOG_SEARCH_LINES is not None and MAX_LOG_SEARCH_LINES > 0:
                 recent_logs = deque(maxlen=MAX_LOG_SEARCH_LINES)
             else:
@@ -2344,8 +2346,16 @@ async def get_logs(
             n_lines = min(n_lines, MAX_LOG_LINES)
             indexed_logs, total_lines = _read_chained_log_lines(chain, offset, n_lines)
             indexed_logs = [(idx, line) for idx, line in indexed_logs]
-        
-        # Filter by search term
+
+        # 先按分级过滤
+        if level:
+            level_upper = level.upper()
+            indexed_logs = [
+                (idx, line) for idx, line in indexed_logs
+                if extract_log_level(line) == level_upper
+            ]
+
+        # 再按搜索过滤
         if search:
             lowered = search.lower()
             filtered_indexed_logs = [

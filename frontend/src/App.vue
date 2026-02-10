@@ -2349,36 +2349,46 @@ const buildWsUrl = (path) => {
 // 点击分级按钮时自动发起分级搜索
 const onLogLevelClick = (level) => {
   logLevelFilter.value = level
+  // 切换分级时，清空搜索内容
+  logSearch.value = ''
+  // ERROR/WARNING/DEBUG 触发后端分级过滤，暂停实时
   if (["ERROR", "WARNING", "DEBUG"].includes(level)) {
-    // 直接设置过滤器，不触发搜索API，而是让filteredDisplayedLogs过滤当前logs
-    logSearch.value = ''  // 清空搜索，避免冲突
-    // 不暂停WebSocket，保持实时更新
-    // 自动发起分级搜索并暂停实时推送
-    logSearch.value = level
     if (!logPaused.value) {
       logPaused.value = true
       if (logSocket && logSocket.readyState === 1) {
         logSocket.send(JSON.stringify({ action: 'pause' }))
       }
     }
-  } else if (level === "INFO") {
-    // 切换到INFO时清空搜索内容，恢复实时，仅显示当前实时流的INFO内容
-    logSearch.value = ''
+    // 主动拉取分级日志
+    fetchLogsByLevel(level)
+  } else if (level === "INFO" || level === "ALL") {
+    // INFO/ALL 恢复实时
     if (logPaused.value) {
       logPaused.value = false
       if (logSocket && logSocket.readyState === 1) {
         logSocket.send(JSON.stringify({ action: 'resume' }))
       }
     }
-    // logs.value[service] 不变，filteredDisplayedLogs 会自动只显示 INFO
-  } else if (level === 'ALL') {
-    logSearch.value = ''
-    if (logPaused.value) {
-      logPaused.value = false
-      if (logSocket && logSocket.readyState === 1) {
-        logSocket.send(JSON.stringify({ action: 'resume' }))
-      }
-    }
+    // logs.value[service] 不变，filteredDisplayedLogs 会自动只显示对应内容
+  }
+}
+
+// 新增：按分级拉取日志
+const fetchLogsByLevel = async (level) => {
+  const service = selectedService.value
+  if (!service) return
+  logsLoading.value[service] = true
+  try {
+    const params = new URLSearchParams({ service, lines: 'all', offset: '0', level })
+    const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+    if (!response.ok) throw new Error('Failed to fetch logs by level')
+    const data = await response.json()
+    logs.value[service] = data.logs
+    logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
+  } catch (e) {
+    showNotification(t('logs_load_failed'), 'error')
+  } finally {
+    logsLoading.value[service] = false
   }
 }
 
@@ -4947,8 +4957,11 @@ watch(logSearch, (keyword) => {
         logSearchInProgress = false
         return
       }
-      // 单次API请求，lines=all
+      // 单次API请求，lines=all，带分级参数
       const params = new URLSearchParams({ service, lines: 'all', offset: '0', search: keyword })
+      if (["ERROR", "WARNING", "DEBUG"].includes(logLevelFilter.value)) {
+        params.set('level', logLevelFilter.value)
+      }
       const response = await authorizedFetch(`/api/logs?${params.toString()}`)
       if (!response.ok) throw new Error('Failed to search logs')
       const data = await response.json()
