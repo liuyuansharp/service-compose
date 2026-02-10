@@ -4865,6 +4865,8 @@ const totalLogs = computed(() => {
 let logSearchDebounceTimer = null
 let logSearchInProgress = false
 watch(logSearch, (keyword) => {
+  const service = selectedService.value
+  if (service) logs.value[service] = []
   if (logSearchDebounceTimer) clearTimeout(logSearchDebounceTimer)
   logSearchDebounceTimer = setTimeout(async () => {
     const service = selectedService.value
