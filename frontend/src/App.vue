@@ -4861,68 +4861,77 @@ const totalLogs = computed(() => {
   return logs.value[selectedService.value]?.length || 0
 })
 
-// 监听搜索输入，触发全量搜索
-watch(logSearch, async (keyword) => {
-  const service = selectedService.value
-  if (!service) return
-  if (!logPaused.value) {
-    logPaused.value = true
-    if (logSocket && logSocket.readyState === 1) {
-      logSocket.send(JSON.stringify({ action: 'pause' }))
-    }
-  }
-  logsLoading.value[service] = true
-  try {
-    if (!keyword) {
-      searchMatches.value[service] = []
-      currentMatchIndex.value[service] = -1
-      logsLoading.value[service] = false
-      return
-    }
-    // 自动分页拉取所有匹配项
-    let allLogs = []
-    let matches = []
-    let offset = 0
-    let hasMore = true
-    let total = 0
-    let searched = 0
-    while (hasMore) {
-      const params = new URLSearchParams({ service, lines: '200', offset: offset.toString(), search: keyword })
-      const response = await authorizedFetch(`/api/logs?${params.toString()}`)
-      if (!response.ok) throw new Error('Failed to search logs')
-      const data = await response.json()
-      if (offset === 0) {
-        total = data.total
-        searched = data.searched
+// 日志搜索防抖与并发保护
+let logSearchDebounceTimer = null
+let logSearchInProgress = false
+watch(logSearch, (keyword) => {
+  if (logSearchDebounceTimer) clearTimeout(logSearchDebounceTimer)
+  logSearchDebounceTimer = setTimeout(async () => {
+    const service = selectedService.value
+    if (!service) return
+    if (logSearchInProgress) return
+    logSearchInProgress = true
+    if (!logPaused.value) {
+      logPaused.value = true
+      if (logSocket && logSocket.readyState === 1) {
+        logSocket.send(JSON.stringify({ action: 'pause' }))
       }
-      // 合并本页日志
-      allLogs = allLogs.concat(data.logs)
-      // 记录本页匹配行号
-      data.logs.forEach((log) => {
-        if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-          if (typeof log.line === 'number') {
-            matches.push(log.line - 1)
-          }
+    }
+    logsLoading.value[service] = true
+    try {
+      if (!keyword) {
+        searchMatches.value[service] = []
+        currentMatchIndex.value[service] = -1
+        logsLoading.value[service] = false
+        logSearchInProgress = false
+        return
+      }
+      // 自动分页拉取所有匹配项
+      let allLogs = []
+      let matches = []
+      let offset = 0
+      let hasMore = true
+      let total = 0
+      let searched = 0
+      while (hasMore) {
+        const params = new URLSearchParams({ service, lines: '200', offset: offset.toString(), search: keyword })
+        const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+        if (!response.ok) throw new Error('Failed to search logs')
+        const data = await response.json()
+        if (offset === 0) {
+          total = data.total
+          searched = data.searched
         }
-      })
-      if (data.has_more_next) {
-        offset += data.logs.length
-      } else {
-        hasMore = false
+        // 合并本页日志
+        allLogs = allLogs.concat(data.logs)
+        // 记录本页匹配行号
+        data.logs.forEach((log) => {
+          if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
+            if (typeof log.line === 'number') {
+              matches.push(log.line - 1)
+            }
+          }
+        })
+        if (data.has_more_next) {
+          offset += data.logs.length
+        } else {
+          hasMore = false
+        }
       }
+      logs.value[service] = allLogs
+      logsMeta.value[service] = { total, offset: 0, searched }
+      searchMatches.value[service] = matches
+      currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
+      await nextTick()
+      scrollLogsToTop()
+    } catch (e) {
+      console.error('Search logs error:', e)
+      showNotification(t('search_failed'), 'error')
+    } finally {
+      logsLoading.value[service] = false
+      logSearchInProgress = false
     }
-    logs.value[service] = allLogs
-    logsMeta.value[service] = { total, offset: 0, searched }
-    searchMatches.value[service] = matches
-    currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
-    await nextTick()
-    scrollLogsToTop()
-  } catch (e) {
-    console.error('Search logs error:', e)
-    showNotification(t('search_failed'), 'error')
-  } finally {
-    logsLoading.value[service] = false
-  }
+  }, 500)
 })
 
 watch(metricsRangeHours, () => {

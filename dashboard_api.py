@@ -80,7 +80,7 @@ METRICS_LAST_IO_READ: Dict[str, int] = {}
 METRICS_LAST_IO_WRITE: Dict[str, int] = {}
 UPDATE_TASKS: Dict[str, Dict] = {}
 MAX_LOG_LINES = 500
-MAX_LOG_SEARCH_LINES = 5000
+MAX_LOG_SEARCH_LINES = 100000
 MAX_METRICS_HISTORY_POINTS = 2000
 MAX_LOG_BYTES = 10 * 1024 * 1024       # Single log file max size (10MB, matches RotatingFileHandler)
 MAX_LOG_BACKUPS = 3                     # Max backup files per service (.log.1, .log.2, .log.3)
@@ -2311,20 +2311,29 @@ async def get_logs(
         # Read log files (chained: all backups + current)
         total_lines = 0
         if search:
-            # For search, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES)
-            recent_logs = deque(maxlen=MAX_LOG_SEARCH_LINES)
+            # For search, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES if >0)
+            if MAX_LOG_SEARCH_LINES is not None and MAX_LOG_SEARCH_LINES > 0:
+                recent_logs = deque(maxlen=MAX_LOG_SEARCH_LINES)
+            else:
+                recent_logs = []
             global_idx = 0
             for fpath in chain:
                 try:
                     with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
                         for line in f:
-                            recent_logs.append((global_idx, line))
+                            if MAX_LOG_SEARCH_LINES is not None and MAX_LOG_SEARCH_LINES > 0:
+                                recent_logs.append((global_idx, line))
+                            else:
+                                recent_logs.append((global_idx, line))
                             global_idx += 1
                 except Exception:
                     pass
             total_lines = global_idx
-            base_index = max(total_lines - len(recent_logs), 0)
-            indexed_logs = [(idx, line) for idx, line in recent_logs]
+            if MAX_LOG_SEARCH_LINES is not None and MAX_LOG_SEARCH_LINES > 0:
+                base_index = max(total_lines - len(recent_logs), 0)
+                indexed_logs = [(idx, line) for idx, line in recent_logs]
+            else:
+                indexed_logs = recent_logs
         else:
             try:
                 n_lines = int(lines)
