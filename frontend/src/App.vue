@@ -1850,7 +1850,7 @@
                     :class="auditActionClass(entry.action)"
                   >{{ t('audit_action_' + entry.action) || entry.action }}</span>
                 </td>
-                <td class="py-2 px-4 text-xs text-gray-700 dark:text-gray-300 font-mono">{{ entry.target || '—' }}</td>
+                <td class="py-2 px-4 text-xs text-gray-700 dark:text-gray-300 font-mono max-w-[200px] truncate" :title="entry.target">{{ entry.target || '—' }}</td>
                 <td class="py-2 px-4 text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate" :title="entry.detail">{{ entry.detail || '—' }}</td>
                 <td class="py-2 px-4">
                   <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
