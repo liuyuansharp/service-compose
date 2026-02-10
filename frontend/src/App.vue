@@ -1327,7 +1327,7 @@
             <button
               v-for="lvl in logLevelFilters"
               :key="lvl.value"
-              @click="logLevelFilter = lvl.value"
+              @click="onLogLevelClick(lvl.value)"
               class="px-2 py-1 rounded text-[10px] font-semibold transition leading-none"
               :class="logLevelFilter === lvl.value
                 ? lvl.activeClass
@@ -2344,6 +2344,17 @@ const buildWsUrl = (path) => {
   const wsHost = window.location.hostname
   const wsPort = isDevOnVite ? '8080' : (window.location.port || '8080')
   return `${wsProto}://${wsHost}:${wsPort}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+// 点击分级按钮时自动发起分级搜索
+const onLogLevelClick = (level) => {
+  logLevelFilter.value = level
+  if (['ERROR', 'WARNING', 'DEBUG'].includes(level)) {
+    // 自动发起分级搜索
+    logSearch.value = level
+  } else if (level === 'ALL') {
+    logSearch.value = ''
+  }
 }
 
 const translations = {
@@ -4850,23 +4861,46 @@ const filteredDisplayedLogs = computed(() => {
   return filtered
 })
 
-// 获取各日志级别的条目数
+
+// 全量日志分级统计（后端）
+const logLevelCounts = ref({ ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 })
+
 const getLogLevelCount = (level) => {
-  const all = displayedLogs.value
-  if (!all.length) return 0
-  return all.filter(l => l.level === level).length
+  if (level === 'INFO') {
+    // 只显示当前页面实际展示的 INFO 数
+    return filteredDisplayedLogs.value.filter(l => l.level === 'INFO').length
+  }
+  // 其他分级用后端全量统计
+  return logLevelCounts.value[level] || 0
 }
+
+// 拉取后端分级统计
+const fetchLogLevelCounts = async (service) => {
+  if (!service) return
+  try {
+    const resp = await authorizedFetch(`/api/logs/level-counts?service=${service}`)
+    if (resp.ok) {
+      const data = await resp.json()
+      logLevelCounts.value = data.counts || { ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 }
+    }
+  } catch (e) {
+    logLevelCounts.value = { ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 }
+  }
+}
+
+// 监听服务切换自动拉取分级统计
+watch(selectedService, (service) => {
+  fetchLogLevelCounts(service)
+}, { immediate: true })
 
 const totalLogs = computed(() => {
   return logs.value[selectedService.value]?.length || 0
 })
 
-// 日志搜索防抖与并发保护
+// 日志搜索防抖与并发保护（单次API请求，lines=all）
 let logSearchDebounceTimer = null
 let logSearchInProgress = false
 watch(logSearch, (keyword) => {
-  const service = selectedService.value
-  if (service) logs.value[service] = []
   if (logSearchDebounceTimer) clearTimeout(logSearchDebounceTimer)
   logSearchDebounceTimer = setTimeout(async () => {
     const service = selectedService.value
@@ -4888,40 +4922,22 @@ watch(logSearch, (keyword) => {
         logSearchInProgress = false
         return
       }
-      // 自动分页拉取所有匹配项
-      let allLogs = []
-      let matches = []
-      let offset = 0
-      let hasMore = true
-      let total = 0
-      let searched = 0
-      while (hasMore) {
-        const params = new URLSearchParams({ service, lines: '200', offset: offset.toString(), search: keyword })
-        const response = await authorizedFetch(`/api/logs?${params.toString()}`)
-        if (!response.ok) throw new Error('Failed to search logs')
-        const data = await response.json()
-        if (offset === 0) {
-          total = data.total
-          searched = data.searched
-        }
-        // 合并本页日志
-        allLogs = allLogs.concat(data.logs)
-        // 记录本页匹配行号
-        data.logs.forEach((log) => {
-          if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-            if (typeof log.line === 'number') {
-              matches.push(log.line - 1)
-            }
+      // 单次API请求，lines=all
+      const params = new URLSearchParams({ service, lines: 'all', offset: '0', search: keyword })
+      const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to search logs')
+      const data = await response.json()
+      logs.value[service] = data.logs
+      logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
+      // 记录所有匹配行号
+      const matches = []
+      data.logs.forEach((log) => {
+        if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
+          if (typeof log.line === 'number') {
+            matches.push(log.line - 1)
           }
-        })
-        if (data.has_more_next) {
-          offset += data.logs.length
-        } else {
-          hasMore = false
         }
-      }
-      logs.value[service] = allLogs
-      logsMeta.value[service] = { total, offset: 0, searched }
+      })
       searchMatches.value[service] = matches
       currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
       await nextTick()

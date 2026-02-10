@@ -2558,6 +2558,25 @@ async def download_logs(service: str = Query("platform"), current_user: dict = D
         logger.error(f"Download error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# 新增：统计所有日志文件分级数量
+@app.get("/api/logs/level-counts")
+async def get_log_level_counts(
+    service: str = Query("platform"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict:
+    """Return log level counts for all chained log files of a service."""
+    chain = _get_log_chain(service)
+    counts = {"ERROR": 0, "WARNING": 0, "INFO": 0, "DEBUG": 0}
+    for fpath in chain:
+        try:
+            with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    lvl = extract_log_level(line)
+                    if lvl in counts:
+                        counts[lvl] += 1
+        except Exception:
+            pass
+    return {"service": service, "counts": counts}
 
 # WebSocket connection manager
 class ConnectionManager:
