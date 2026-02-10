@@ -4873,33 +4873,48 @@ watch(logSearch, async (keyword) => {
   }
   logsLoading.value[service] = true
   try {
-    const params = new URLSearchParams({ service, lines: '200', offset: '0' })
-    if (keyword) params.append('search', keyword)
-    const response = await authorizedFetch(`/api/logs?${params.toString()}`)
-    if (!response.ok) throw new Error('Failed to search logs')
-    const data = await response.json()
-    logs.value[service] = data.logs
-    logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
-    logOffset.value[service] = data.offset
-    logHasMorePrev.value[service] = data.has_more_prev
-    logHasMoreNext.value[service] = data.has_more_next
-    // 记录当前批次中的匹配行号（使用全局行号 data.offset + index）
-    if (keyword) {
-      const matches = []
+    if (!keyword) {
+      searchMatches.value[service] = []
+      currentMatchIndex.value[service] = -1
+      logsLoading.value[service] = false
+      return
+    }
+    // 自动分页拉取所有匹配项
+    let allLogs = []
+    let matches = []
+    let offset = 0
+    let hasMore = true
+    let total = 0
+    let searched = 0
+    while (hasMore) {
+      const params = new URLSearchParams({ service, lines: '200', offset: offset.toString(), search: keyword })
+      const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to search logs')
+      const data = await response.json()
+      if (offset === 0) {
+        total = data.total
+        searched = data.searched
+      }
+      // 合并本页日志
+      allLogs = allLogs.concat(data.logs)
+      // 记录本页匹配行号
       data.logs.forEach((log) => {
         if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-          // searchMatches 中保存 0-based 原始行索引
           if (typeof log.line === 'number') {
             matches.push(log.line - 1)
           }
         }
       })
-      searchMatches.value[service] = matches
-      currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
-    } else {
-      searchMatches.value[service] = []
-      currentMatchIndex.value[service] = -1
+      if (data.has_more_next) {
+        offset += data.logs.length
+      } else {
+        hasMore = false
+      }
     }
+    logs.value[service] = allLogs
+    logsMeta.value[service] = { total, offset: 0, searched }
+    searchMatches.value[service] = matches
+    currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
     await nextTick()
     scrollLogsToTop()
   } catch (e) {
