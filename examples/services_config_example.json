@@ -25,7 +25,7 @@
       "scheduled_restart": {
         "enabled": true,
         "cron": "03:00@0,1",
-        "last_restart": "2026-02-09T21:07:07.487836"
+        "last_restart": "2026-02-10T03:00:12.959573"
       }
     },
     {

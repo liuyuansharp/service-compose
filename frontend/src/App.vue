@@ -1249,126 +1249,185 @@
     >
   <div class="tech-card rounded-md w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col">
         <!-- Modal Header -->
-        <div class="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200 dark:border-slate-800">
-          <h3 class="text-base sm:text-xl font-semibold text-gray-900 dark:text-slate-100">
-            {{ t('logs') }} - {{ selectedService }}
-          </h3>
+        <div class="flex justify-between items-center px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 dark:border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 24 24" class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-slate-100">{{ t('logs') }} - {{ selectedService }}</h3>
+              <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('log_viewer_desc') }}</p>
+            </div>
+          </div>
           <button
             @click="selectedService = null"
-            class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl"
+            class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 transition"
           >
-            ✕
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
           </button>
         </div>
 
-        <!-- Modal Controls -->
-  <div class="flex flex-wrap gap-2 sm:gap-3 p-3 sm:p-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
-           <button
-             @click="() => { rememberCurrentPosition(); goToTop() }"
-             class="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs sm:text-sm"
-           >
-             {{ t('top') }}
-           </button>
-           <button
-             @click="() => { rememberCurrentPosition(); goToBottom() }"
-             class="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs sm:text-sm"
-           >
-             {{ t('bottom') }}
-           </button>
-          <button
-            @click="togglePause"
-            class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition"
-            :class="logPaused ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'"
-          >
-            {{ logPaused ? t('resume') : t('pause') }}
-          </button>
-
-          <div class="w-full sm:w-auto sm:flex-1 flex gap-2 items-center order-last sm:order-none">
-            <input
-              v-model="logSearch"
-              type="text"
-              :placeholder="`${t('search_logs')}...`"
-              class="flex-1 min-w-0 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
+        <!-- Toolbar Row 1: Navigation + Stream Control + Actions -->
+        <div class="flex items-center gap-1.5 px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
+          <!-- Left: Navigation group -->
+          <div class="flex items-center gap-1 mr-1">
             <button
-              @click="jumpToPrevMatch"
-              class="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-xs hover:bg-gray-300 dark:hover:bg-gray-600"
+              @click="() => { rememberCurrentPosition(); goToTop() }"
+              class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+              :title="t('top')"
             >
-              ‹ {{ t('prev') }}
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/><line x1="6" y1="5" x2="18" y2="5"/></svg>
             </button>
             <button
-              @click="jumpToNextMatch"
-              class="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-xs hover:bg-gray-300 dark:hover:bg-gray-600"
+              @click="() => { rememberCurrentPosition(); goToBottom() }"
+              class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+              :title="t('bottom')"
             >
-              {{ t('next') }} ›
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/><line x1="6" y1="19" x2="18" y2="19"/></svg>
             </button>
           </div>
 
+          <!-- Stream control -->
           <button
-            @click="downloadLogs"
-            class="px-2 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-xs sm:text-sm"
+            @click="togglePause"
+            class="px-2 py-1 rounded text-[11px] font-medium transition inline-flex items-center gap-1"
+            :class="logPaused ? 'bg-green-600/90 text-white hover:bg-green-700' : 'bg-blue-600/90 text-white hover:bg-blue-700'"
           >
-            {{ t('download') }}
+            <svg v-if="logPaused" viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
+            <svg v-else viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            {{ logPaused ? t('resume') : t('pause') }}
           </button>
 
+          <!-- Spacer -->
+          <div class="flex-1"></div>
+
+          <!-- Right: Action buttons -->
+          <button
+            @click="downloadLogs"
+            class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition"
+            :title="t('download')"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
           <button
             @click="clearLogs"
-            class="px-2 sm:px-4 py-1.5 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs sm:text-sm"
+            class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition"
+            :title="t('clear')"
           >
-            {{ t('clear') }}
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
+        </div>
+
+        <!-- Toolbar Row 2: Level Filter + Search -->
+        <div class="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950/50">
+          <!-- Log Level Filter Pills -->
+          <div class="flex items-center gap-0.5 bg-gray-200/60 dark:bg-gray-800/60 rounded-md p-0.5 flex-shrink-0">
+            <button
+              v-for="lvl in logLevelFilters"
+              :key="lvl.value"
+              @click="logLevelFilter = lvl.value"
+              class="px-2 py-1 rounded text-[10px] font-semibold transition leading-none"
+              :class="logLevelFilter === lvl.value
+                ? lvl.activeClass
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+            >
+              {{ lvl.label }}
+              <span v-if="lvl.value !== 'ALL'" class="ml-0.5 opacity-70">{{ getLogLevelCount(lvl.value) }}</span>
+            </button>
+          </div>
+
+          <!-- Search bar -->
+          <div class="flex-1 min-w-0 flex gap-1 items-center">
+            <div class="relative flex-1 min-w-0">
+              <svg viewBox="0 0 24 24" class="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                v-model="logSearch"
+                type="text"
+                :placeholder="`${t('search_logs')}...`"
+                class="w-full pl-7 pr-2 py-1.5 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              @click="jumpToPrevMatch"
+              class="p-1 bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs transition"
+              :title="t('prev')"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button
+              @click="jumpToNextMatch"
+              class="p-1 bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs transition"
+              :title="t('next')"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
         </div>
 
         <!-- Modal Body - Logs Display -->
         <div
           ref="logsContainer"
           class="flex-1 overflow-y-auto p-3 sm:p-4 bg-black font-mono text-xs sm:text-sm"
-          style="max-height: calc(92vh - 280px)"
+          style="max-height: calc(92vh - 320px)"
         >
-          <div v-if="logsLoading[selectedService]" class="text-gray-400 text-center py-8">
+          <div v-if="logsLoading[selectedService]" class="text-gray-400 text-center py-8 flex items-center justify-center gap-2">
+            <svg class="animate-spin h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"/></svg>
             {{ t('loading_logs') }}...
           </div>
-          <div v-else-if="displayedLogs.length === 0" class="text-gray-500 text-center py-8">
-            {{ t('no_logs_available') }}
+          <div v-else-if="filteredDisplayedLogs.length === 0" class="text-gray-500 text-center py-8">
+            <p>{{ t('no_logs_available') }}</p>
+            <p v-if="logLevelFilter !== 'ALL'" class="text-xs mt-1 text-gray-600">{{ t('log_filter_no_match') }}</p>
           </div>
           <div
-            v-for="(log, idx) in displayedLogs"
-            :key="idx"
-            class="mb-1 whitespace-pre-wrap break-words flex"
+            v-for="(log, idx) in filteredDisplayedLogs"
+            :key="log._fIdx"
+            class="mb-0.5 whitespace-pre-wrap break-words flex group"
             :class="getLogColor(log.level)"
           >
             <span
-              class="text-gray-500 mr-2 select-none w-16 text-right pr-2 border-r border-gray-700 cursor-pointer hover:text-white hover:bg-gray-800/60"
+              class="text-gray-600 mr-1 select-none w-12 sm:w-16 text-right pr-1.5 border-r border-gray-800 cursor-pointer hover:text-white hover:bg-gray-800/60 text-[10px] sm:text-xs flex-shrink-0 leading-5"
               :class="{
-                'bg-yellow-700 text-white': logSearch &&
+                'bg-yellow-700/80 text-white': logSearch &&
                   searchMatches[selectedService] &&
                   currentMatchIndex[selectedService] != null &&
                   currentMatchIndex[selectedService] >= 0 &&
-                  // 使用原始行号对齐匹配：searchMatches 中存的是 0-based 行索引
-                  searchMatches[selectedService][currentMatchIndex[selectedService]] === ((log.line || ((logsMeta[selectedService]?.offset || 0) + idx + 1)) - 1)
+                  searchMatches[selectedService][currentMatchIndex[selectedService]] === ((log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1)) - 1)
               }"
-              @click="jumpToLogLine((log.line || ((logsMeta[selectedService]?.offset || 0) + idx + 1)) - 1)"
+              @click="jumpToLogLine((log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1)) - 1)"
             >
-              {{ log.line || ((logsMeta[selectedService]?.offset || 0) + idx + 1) }}
+              {{ log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1) }}
             </span>
-            <span class="pl-2 flex-1">
-              {{ log.raw }}
-            </span>
+            <!-- Log level badge -->
+            <span
+              class="mx-1 text-[9px] font-bold w-7 text-center flex-shrink-0 leading-5 rounded-sm"
+              :class="{
+                'text-red-400 bg-red-500/10': log.level === 'ERROR',
+                'text-yellow-400 bg-yellow-500/10': log.level === 'WARNING',
+                'text-green-500 bg-green-500/5': log.level === 'INFO',
+                'text-blue-400 bg-blue-500/10': log.level === 'DEBUG',
+                'text-gray-500': !['ERROR','WARNING','INFO','DEBUG'].includes(log.level)
+              }"
+            >{{ log.level?.charAt(0) || '—' }}</span>
+            <span class="pl-1 flex-1 leading-5">{{ log.raw }}</span>
           </div>
         </div>
 
         <!-- Modal Footer -->
-  <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-[10px] sm:text-xs text-gray-600 dark:text-slate-300">
-          {{ t('showing_logs', { count: displayedLogs.length }) }}
+  <div class="px-3 sm:px-4 py-2 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-[10px] sm:text-xs text-gray-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>{{ t('showing_logs', { count: filteredDisplayedLogs.length }) }}</span>
+          <span v-if="logLevelFilter !== 'ALL'" class="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">
+            {{ t('log_level_filter') }}: {{ logLevelFilter }}
+          </span>
           <span v-if="logSearch">
-            ({{ t('filtered_by') }}: "{{ logSearch }}")
+            {{ t('filtered_by') }}: "{{ logSearch }}"
             <span v-if="searchMatches[selectedService] && searchMatches[selectedService].length">
-              &nbsp;|&nbsp;
-              {{ t('match') }} {{ (currentMatchIndex[selectedService] ?? -1) + 1 }} / {{ searchMatches[selectedService].length }}
+              · {{ t('match') }} {{ (currentMatchIndex[selectedService] ?? -1) + 1 }}/{{ searchMatches[selectedService].length }}
             </span>
           </span>
           <span v-if="selectedService && logsMeta[selectedService]">
-            &nbsp;|&nbsp; {{ t('total_lines', { count: logsMeta[selectedService].total }) }}
+            {{ t('total_lines', { count: logsMeta[selectedService].total }) }}
           </span>
         </div>
       </div>
@@ -2027,6 +2086,113 @@
       </div>
     </div>
 
+    <!-- Custom Confirm Dialog -->
+    <Teleport to="body">
+      <Transition name="confirm-fade">
+        <div
+          v-if="confirmDialog.show"
+          class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          @click.self="closeConfirmDialog(false)"
+        >
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+          <div class="relative w-full max-w-md transform transition-all">
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200/80 dark:border-gray-700/60 shadow-2xl overflow-hidden">
+              <!-- Icon + Top accent bar -->
+              <div
+                class="h-1"
+                :class="{
+                  'bg-gradient-to-r from-emerald-400 to-green-500': confirmDialog.type === 'start',
+                  'bg-gradient-to-r from-red-400 to-rose-500': confirmDialog.type === 'stop' || confirmDialog.type === 'danger',
+                  'bg-gradient-to-r from-blue-400 to-indigo-500': confirmDialog.type === 'info',
+                }"
+              ></div>
+
+              <div class="px-6 pt-6 pb-2 text-center">
+                <!-- Animated icon -->
+                <div
+                  class="mx-auto mb-4 h-16 w-16 rounded-full flex items-center justify-center"
+                  :class="{
+                    'bg-emerald-100 dark:bg-emerald-500/15': confirmDialog.type === 'start',
+                    'bg-red-100 dark:bg-red-500/15': confirmDialog.type === 'stop' || confirmDialog.type === 'danger',
+                    'bg-blue-100 dark:bg-blue-500/15': confirmDialog.type === 'info',
+                  }"
+                >
+                  <!-- Start icon -->
+                  <svg v-if="confirmDialog.type === 'start'" viewBox="0 0 24 24" class="h-8 w-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="6 3 20 12 6 21 6 3" />
+                  </svg>
+                  <!-- Stop icon -->
+                  <svg v-else-if="confirmDialog.type === 'stop' || confirmDialog.type === 'danger'" viewBox="0 0 24 24" class="h-8 w-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <rect x="9" y="9" width="6" height="6" rx="0.5"/>
+                  </svg>
+                  <!-- Info icon -->
+                  <svg v-else viewBox="0 0 24 24" class="h-8 w-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                </div>
+
+                <!-- Title -->
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ confirmDialog.title }}</h3>
+
+                <!-- Message -->
+                <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ confirmDialog.message }}</p>
+
+                <!-- Detail / affected count -->
+                <div v-if="confirmDialog.detail" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800/60 text-xs text-gray-600 dark:text-gray-300">
+                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 16h-1v-4h-1"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  {{ confirmDialog.detail }}
+                </div>
+
+                <!-- Services list preview (only affected services) -->
+                <div v-if="(confirmDialog.type === 'start' || confirmDialog.type === 'stop') && batchTargetServices.length > 0" class="mt-4 max-h-32 overflow-y-auto">
+                  <div class="flex flex-wrap gap-1.5 justify-center">
+                    <span
+                      v-for="s in batchTargetServices"
+                      :key="s.name"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono border"
+                      :class="confirmDialog.type === 'start'
+                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                        : 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'"
+                    >
+                      <span
+                        class="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                        :class="confirmDialog.type === 'start' ? 'bg-amber-500' : 'bg-green-500'"
+                      ></span>
+                      {{ s.name }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Buttons -->
+              <div class="px-6 pb-6 pt-4 flex gap-3">
+                <button
+                  @click="closeConfirmDialog(false)"
+                  class="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 transition focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
+                >
+                  {{ confirmDialog.cancelText }}
+                </button>
+                <button
+                  @click="closeConfirmDialog(true)"
+                  class="flex-1 px-4 py-2.5 text-sm font-medium rounded-xl text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2 inline-flex items-center justify-center gap-2"
+                  :class="{
+                    'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500': confirmDialog.type === 'start',
+                    'bg-red-600 hover:bg-red-700 focus:ring-red-500': confirmDialog.type === 'stop' || confirmDialog.type === 'danger',
+                    'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500': confirmDialog.type === 'info',
+                  }"
+                >
+                  <svg v-if="confirmDialog.type === 'start'" viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                  <svg v-else-if="confirmDialog.type === 'stop' || confirmDialog.type === 'danger'" viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                  {{ confirmDialog.confirmText }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Toast Notifications -->
     <Teleport to="body">
       <div v-if="notification" class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
@@ -2201,6 +2367,12 @@ const translations = {
     next: '下一条',
     download: '下载',
     clear: '清空',
+    clear_logs_confirm: '确定要清空当前日志视图吗？这将重置日志流的位置，新日志将从当前时间点开始接收。',
+    clear_logs_success: '日志已清空',
+    log_viewer_desc: '实时日志流与分级查看',
+    log_level_filter: '级别筛选',
+    log_filter_no_match: '当前级别无匹配日志，尝试切换筛选条件',
+    log_level_all: '全部',
     loading_logs: '正在加载日志',
     no_logs_available: '暂无日志',
     showing_logs: '显示 {count} 条日志',
@@ -2286,8 +2458,13 @@ const translations = {
     terminal_popout: '新窗口打开',
     batch_start_all: '全部启动',
     batch_stop_all: '全部停止',
-    batch_start_confirm: '确定要启动所有服务吗？',
-    batch_stop_confirm: '确定要停止所有服务吗？',
+    batch_start_confirm: '确定要启动以下未运行的服务吗？',
+    batch_stop_confirm: '确定要停止以下运行中的服务吗？',
+    batch_confirm_detail: '将操作 {count}/{total} 个服务',
+    batch_no_start_targets: '所有服务均已在运行中，无需启动',
+    batch_no_stop_targets: '所有服务均已停止，无需停止',
+    confirm_yes: '确认',
+    confirm_no: '取消',
     batch_action_success: '批量{action}操作已执行',
     batch_action_failed: '批量{action}操作失败',
     role_admin: '管理员',
@@ -2473,6 +2650,12 @@ const translations = {
     next: 'Next',
     download: 'Download',
     clear: 'Clear',
+    clear_logs_confirm: 'Clear the current log view? The log stream position will be reset and new logs will be received from the current point.',
+    clear_logs_success: 'Logs cleared',
+    log_viewer_desc: 'Real-time log streaming with level filtering',
+    log_level_filter: 'Level filter',
+    log_filter_no_match: 'No logs match the current filter. Try switching levels.',
+    log_level_all: 'All',
     loading_logs: 'Loading logs',
     no_logs_available: 'No logs available',
     showing_logs: 'Showing {count} logs',
@@ -2558,8 +2741,13 @@ const translations = {
     terminal_popout: 'Pop out',
     batch_start_all: 'Start All',
     batch_stop_all: 'Stop All',
-    batch_start_confirm: 'Are you sure you want to start all services?',
-    batch_stop_confirm: 'Are you sure you want to stop all services?',
+    batch_start_confirm: 'Start the following stopped services?',
+    batch_stop_confirm: 'Stop the following running services?',
+    batch_confirm_detail: 'Will affect {count}/{total} services',
+    batch_no_start_targets: 'All services are already running',
+    batch_no_stop_targets: 'All services are already stopped',
+    confirm_yes: 'Confirm',
+    confirm_no: 'Cancel',
     batch_action_success: 'Batch {action} executed successfully',
     batch_action_failed: 'Batch {action} failed',
     role_admin: 'Admin',
@@ -3308,9 +3496,28 @@ const searchMatches = ref({}) // { service: [globalIndex1, globalIndex2, ...] }
 const currentMatchIndex = ref({}) // { service: 当前匹配在 searchMatches 数组中的下标 }
 const logPaused = ref(false)
 const logSearch = ref('')
+const logLevelFilter = ref('ALL')
+const logLevelFilters = [
+  { value: 'ALL',     label: computed(() => t('log_level_all')),  activeClass: 'bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-sm' },
+  { value: 'ERROR',   label: 'ERR',      activeClass: 'bg-red-500/90 text-white shadow-sm' },
+  { value: 'WARNING', label: 'WARN',     activeClass: 'bg-yellow-500/90 text-white shadow-sm' },
+  { value: 'INFO',    label: 'INFO',     activeClass: 'bg-green-500/90 text-white shadow-sm' },
+  { value: 'DEBUG',   label: 'DBG',      activeClass: 'bg-blue-500/90 text-white shadow-sm' },
+]
 const lastUpdated = ref('')
 const controlling = ref(false)
 const notification = ref(null)
+// Custom confirm dialog state
+const confirmDialog = ref({
+  show: false,
+  type: 'info',      // 'start' | 'stop' | 'danger' | 'info'
+  title: '',
+  message: '',
+  detail: '',
+  confirmText: '',
+  cancelText: '',
+  onConfirm: null,
+})
 const statusAlertVisibility = ref({})
 const focusedAlertKey = ref('')
 let focusAlertTimer = null
@@ -3461,11 +3668,36 @@ const noServicesRunning = computed(() => {
   return runningCount.value === 0
 })
 
+// Filtered services for batch confirm dialog preview
+const batchTargetServices = ref([])
+
 const batchControlAll = async (action) => {
-  if (!confirm(t(action === 'start' ? 'batch_start_confirm' : 'batch_stop_confirm'))) return
+  const isStart = action === 'start'
+  // Smart filter: start → only stopped/abnormal services; stop → only running services
+  const filtered = visibleServices.value.filter(s => {
+    const state = getHealthState(s)
+    return isStart ? state !== 'running' : state === 'running'
+  })
+  if (filtered.length === 0) {
+    showNotification(t(isStart ? 'batch_no_start_targets' : 'batch_no_stop_targets'), 'info')
+    return
+  }
+  batchTargetServices.value = filtered
+  const count = filtered.length
+  openConfirmDialog({
+    type: isStart ? 'start' : 'stop',
+    title: t(isStart ? 'batch_start_all' : 'batch_stop_all'),
+    message: t(isStart ? 'batch_start_confirm' : 'batch_stop_confirm'),
+    detail: t('batch_confirm_detail', { count, total: visibleServices.value.length }),
+    confirmText: t(isStart ? 'batch_start_all' : 'batch_stop_all'),
+    onConfirm: () => executeBatchControl(action),
+  })
+}
+
+const executeBatchControl = async (action) => {
   controlling.value = true
   try {
-    const targets = visibleServices.value.map(s => s.name)
+    const targets = batchTargetServices.value.map(s => s.name)
     const results = await Promise.allSettled(
       targets.map(name =>
         authorizedFetch('/api/control', {
@@ -4466,6 +4698,7 @@ const closeMetrics = () => {
 watch(selectedService, (newService, oldService) => {
   if (newService) {
     // 如果打开了新的日志窗口，则连接
+    logLevelFilter.value = 'ALL'
     connectLogWebSocket(newService)
   } else if (oldService) {
     // 如果关闭了日志窗口（从一个 service 变为 null）
@@ -4486,6 +4719,28 @@ watch(selectedService, (newService, oldService) => {
 const displayedLogs = computed(() => {
   return logs.value[selectedService.value] || []
 })
+
+// 按日志级别过滤后的日志列表
+const filteredDisplayedLogs = computed(() => {
+  const all = displayedLogs.value
+  if (logLevelFilter.value === 'ALL') {
+    return all.map((log, idx) => ({ ...log, _origIdx: idx, _fIdx: idx }))
+  }
+  const filtered = []
+  all.forEach((log, idx) => {
+    if (log.level === logLevelFilter.value) {
+      filtered.push({ ...log, _origIdx: idx, _fIdx: filtered.length })
+    }
+  })
+  return filtered
+})
+
+// 获取各日志级别的条目数
+const getLogLevelCount = (level) => {
+  const all = displayedLogs.value
+  if (!all.length) return 0
+  return all.filter(l => l.level === level).length
+}
 
 const totalLogs = computed(() => {
   return logs.value[selectedService.value]?.length || 0
@@ -4831,7 +5086,18 @@ const downloadLogs = async () => {
 }
 
 const clearLogs = () => {
-  logs.value[selectedService.value] = []
+  if (!confirm(t('clear_logs_confirm'))) return
+  const service = selectedService.value
+  logs.value[service] = []
+  logsMeta.value[service] = null
+  searchMatches.value[service] = []
+  currentMatchIndex.value[service] = -1
+  logLevelFilter.value = 'ALL'
+  // 通知后端WebSocket将文件指针移到末尾，后续只接收新日志
+  if (logSocket && logSocket.readyState === 1) {
+    logSocket.send(JSON.stringify({ action: 'clear' }))
+  }
+  showNotification(t('clear_logs_success'), 'success')
 }
 
 const getLogColor = (level) => {
@@ -4951,6 +5217,26 @@ const showNotification = (message, type = 'success', details = null) => {
   setTimeout(() => {
     notification.value = null
   }, 3000)
+}
+
+const openConfirmDialog = ({ type = 'info', title, message, detail = '', confirmText, cancelText, onConfirm }) => {
+  confirmDialog.value = {
+    show: true,
+    type,
+    title: title || '',
+    message: message || '',
+    detail,
+    confirmText: confirmText || t('confirm_yes'),
+    cancelText: cancelText || t('confirm_no'),
+    onConfirm,
+  }
+}
+
+const closeConfirmDialog = (confirmed = false) => {
+  if (confirmed && confirmDialog.value.onConfirm) {
+    confirmDialog.value.onConfirm()
+  }
+  confirmDialog.value.show = false
 }
 
 const isStatusAlertVisible = (key) => Boolean(statusAlertVisibility.value[key])
@@ -5655,6 +5941,34 @@ onUnmounted(() => {
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
+}
+
+/* ---- Confirm dialog transition ---- */
+.confirm-fade-enter-active {
+  transition: opacity 0.2s ease-out;
+}
+.confirm-fade-enter-active .relative {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease-out;
+}
+.confirm-fade-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+.confirm-fade-leave-active .relative {
+  transition: transform 0.15s ease-in, opacity 0.15s ease-in;
+}
+.confirm-fade-enter-from {
+  opacity: 0;
+}
+.confirm-fade-enter-from .relative {
+  opacity: 0;
+  transform: scale(0.9) translateY(10px);
+}
+.confirm-fade-leave-to {
+  opacity: 0;
+}
+.confirm-fade-leave-to .relative {
+  opacity: 0;
+  transform: scale(0.95) translateY(-5px);
 }
 
 /* ---- 服务卡片拖拽排序 ---- */

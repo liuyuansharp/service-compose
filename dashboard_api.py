@@ -205,6 +205,18 @@ def get_user_from_request(request: Request, token_param: Optional[str] = None) -
     if not token:
         raise HTTPException(status_code=401, detail="Missing authentication token")
     return decode_token(token)
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
+    # Startup
+    init_auth_db()
+    asyncio.create_task(_metrics_sampler())
+    asyncio.create_task(_system_metrics_persist_loop())
+    asyncio.create_task(_log_maintenance())
+    asyncio.create_task(_scheduled_restart_loop())
+    yield
+    # Shutdown (cleanup if needed)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -212,7 +224,8 @@ app = FastAPI(
     description="Real-time monitoring and control API for platform and microservices",
     version="1.0.0",
     docs_url="/api/docs",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -1818,30 +1831,6 @@ async def rollback_update(
     except Exception as exc:
         append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action="rollback", target=service, detail=f"backup={backup}", result="failed")
         raise HTTPException(status_code=400, detail=str(exc))
-
-@app.on_event("startup")
-async def _start_metrics_sampler():
-    asyncio.create_task(_metrics_sampler())
-
-
-@app.on_event("startup")
-async def _start_system_metrics_persist():
-    asyncio.create_task(_system_metrics_persist_loop())
-
-
-@app.on_event("startup")
-async def _start_log_maintenance():
-    asyncio.create_task(_log_maintenance())
-
-
-@app.on_event("startup")
-async def _start_scheduled_restart():
-    asyncio.create_task(_scheduled_restart_loop())
-
-
-@app.on_event("startup")
-async def _init_auth():
-    init_auth_db()
 
 @app.get("/api/health")
 async def health_check():
