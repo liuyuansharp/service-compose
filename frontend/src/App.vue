@@ -2416,7 +2416,9 @@ const translations = {
     next: '下一条',
     download: '下载',
     clear: '清空',
+    clear_logs_title: '清空日志',
     clear_logs_confirm: '确定要清空当前日志视图吗？这将重置日志流的位置，新日志将从当前时间点开始接收。',
+    clear_logs_action: '确认清空',
     clear_logs_success: '日志已清空',
     log_viewer_desc: '实时日志流与分级查看',
     log_level_filter: '级别筛选',
@@ -2704,7 +2706,9 @@ const translations = {
     next: 'Next',
     download: 'Download',
     clear: 'Clear',
+    clear_logs_title: 'Clear Logs',
     clear_logs_confirm: 'Clear the current log view? The log stream position will be reset and new logs will be received from the current point.',
+    clear_logs_action: 'Clear',
     clear_logs_success: 'Logs cleared',
     log_viewer_desc: 'Real-time log streaming with level filtering',
     log_level_filter: 'Level filter',
@@ -5197,18 +5201,25 @@ const downloadLogs = async () => {
 }
 
 const clearLogs = () => {
-  if (!confirm(t('clear_logs_confirm'))) return
-  const service = selectedService.value
-  logs.value[service] = []
-  logsMeta.value[service] = null
-  searchMatches.value[service] = []
-  currentMatchIndex.value[service] = -1
-  logLevelFilter.value = 'ALL'
-  // 通知后端WebSocket将文件指针移到末尾，后续只接收新日志
-  if (logSocket && logSocket.readyState === 1) {
-    logSocket.send(JSON.stringify({ action: 'clear' }))
-  }
-  showNotification(t('clear_logs_success'), 'success')
+  openConfirmDialog({
+    type: 'danger',
+    title: t('clear_logs_title'),
+    message: t('clear_logs_confirm'),
+    confirmText: t('clear_logs_action'),
+    onConfirm: () => {
+      const service = selectedService.value
+      logs.value[service] = []
+      logsMeta.value[service] = null
+      searchMatches.value[service] = []
+      currentMatchIndex.value[service] = -1
+      logLevelFilter.value = 'ALL'
+      // 通知后端WebSocket将文件指针移到末尾，后续只接收新日志
+      if (logSocket && logSocket.readyState === 1) {
+        logSocket.send(JSON.stringify({ action: 'clear' }))
+      }
+      showNotification(t('clear_logs_success'), 'success')
+    },
+  })
 }
 
 const getLogColor = (level) => {
