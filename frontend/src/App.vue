@@ -3011,15 +3011,16 @@ const connectLogWebSocket = (service) => {
   logSocket.onmessage = (event) => {
     const data = JSON.parse(event.data)
     if (data.type === 'log') {
-      // Assign a sequential line number for display
+      // 新日志的行号 = offset + logs.length + 1
       const meta = logsMeta.value[service]
-      const currentTotal = meta ? meta.total : (logs.value[service]?.length || 0)
-      data.line = currentTotal + 1
+      const offset = meta ? (meta.offset || 0) : 0
+      const curLen = logs.value[service]?.length || 0
+      data.line = offset + curLen + 1
       logs.value[service] = [...(logs.value[service] || []), data]
       if (logsMeta.value[service]) {
-        logsMeta.value[service].total = currentTotal + 1
+        logsMeta.value[service].total = offset + curLen + 1
       } else {
-        logsMeta.value[service] = { total: currentTotal + 1, offset: 0 }
+        logsMeta.value[service] = { total: offset + curLen + 1, offset }
       }
       nextTick(scrollLogsToBottom)
     }
@@ -5217,7 +5218,17 @@ const clearLogs = () => {
     onConfirm: () => {
       const service = selectedService.value
       logs.value[service] = []
+      // 清空后立即拉取一次日志元数据（total/offset），保证后续新日志行号递增
       logsMeta.value[service] = { total: 0, offset: 0 }
+      ;(async () => {
+        try {
+          const resp = await authorizedFetch(`/api/logs?service=${service}&lines=1&offset=-1`)
+          if (resp.ok) {
+            const data = await resp.json()
+            logsMeta.value[service] = { total: data.total, offset: data.offset }
+          }
+        } catch (e) {}
+      })()
       searchMatches.value[service] = []
       currentMatchIndex.value[service] = -1
       logHasMorePrev.value[service] = false
