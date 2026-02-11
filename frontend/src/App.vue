@@ -1439,7 +1439,7 @@
               · {{ t('match') }} {{ (currentMatchIndex[selectedService] ?? -1) + 1 }}/{{ searchMatches[selectedService].length }}
             </span>
           </span>
-          <span v-if="selectedService && logsMeta[selectedService]">
+          <span v-if="selectedService && logsMeta[selectedService] && logMode === 'history'">
             {{ t('total_lines', { count: logsMeta[selectedService].total }) }}
           </span>
         </div>
@@ -2505,9 +2505,13 @@ const translations = {
     loading_logs: '正在加载日志',
     no_logs_available: '暂无日志',
     showing_logs: '显示 {count} 条日志',
+    live_count: '实时 {count}',
+    total_count: '总计 {count}',
     filtered_by: '过滤条件',
     match: '匹配',
     total_lines: '总行数 {count}',
+    live_count: '当前流内: {count}',
+    total_count: '历史总数: {count}',
     user: '用户',
     login_required: '请输入用户名和密码',
     login_failed: '登录失败',
@@ -2801,9 +2805,13 @@ const translations = {
     loading_logs: 'Loading logs',
     no_logs_available: 'No logs available',
     showing_logs: 'Showing {count} logs',
+    live_count: 'Live {count}',
+    total_count: 'Total {count}',
     filtered_by: 'filtered by',
     match: 'Match',
     total_lines: 'Total {count} lines',
+    live_count: 'Live: {count}',
+    total_count: 'Total: {count}',
     user: 'User',
     login_required: 'Username and password are required',
     login_failed: 'Login failed',
@@ -4962,21 +4970,6 @@ const closeMetrics = () => {
   }
 }
 
-// 监听 selectedService 变化以便在 live 模式下建立 WebSocket 连接并在关闭时清理
-watch(selectedService, (service) => {
-  fetchLogLevelCounts(service)
-  if (!service) {
-    if (logSocket) {
-      logSocket.close()
-      logSocket = null
-      logSocketService = null
-    }
-    return
-  }
-  if (logMode.value === 'live') {
-    connectLogWebSocket(service)
-  }
-}, { immediate: true })
 // 监听日志模式变化，切换时进行必要的连接/加载
 watch(logMode, (mode) => {
   const svc = selectedService.value
@@ -5046,6 +5039,22 @@ const fetchLogLevelCounts = async (service) => {
     logLevelCounts.value = { ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 }
   }
 }
+
+// 监听 selectedService 变化以便在 live 模式下建立 WebSocket 连接并在关闭时清理
+watch(selectedService, (service) => {
+  fetchLogLevelCounts(service)
+  if (!service) {
+    if (logSocket) {
+      logSocket.close()
+      logSocket = null
+      logSocketService = null
+    }
+    return
+  }
+  if (logMode.value === 'live') {
+    connectLogWebSocket(service)
+  }
+}, { immediate: true })
 
 // 服务切换处理已在上方的 watch(selectedService) 中处理（包含连接和统计）
 
