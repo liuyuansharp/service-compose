@@ -1338,6 +1338,18 @@
             </button>
           </div>
 
+          <!-- Log mode toggle -->
+          <div class="flex items-center gap-1 ml-3 flex-shrink-0">
+            <button
+              @click.prevent="setLogMode('live')"
+              :class="['px-2 py-1 rounded text-[10px] font-semibold transition', logMode === 'live' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700']"
+            >{{ t('log_mode_live') }}</button>
+            <button
+              @click.prevent="setLogMode('history')"
+              :class="['px-2 py-1 rounded text-[10px] font-semibold transition', logMode === 'history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700']"
+            >{{ t('log_mode_history') }}</button>
+          </div>
+
           <!-- Search bar -->
           <div class="flex-1 min-w-0 flex gap-1 items-center">
             <div class="relative flex-1 min-w-0">
@@ -2469,6 +2481,8 @@ const translations = {
     clear_logs_action: '确认清空',
     clear_logs_success: '日志已清空',
     log_viewer_desc: '实时日志流与分级查看',
+    log_mode_live: '实时',
+    log_mode_history: '历史',
     log_level_filter: '级别筛选',
     log_filter_no_match: '当前级别无匹配日志，尝试切换筛选条件',
     log_level_all: '全部',
@@ -2761,6 +2775,8 @@ const translations = {
     clear_logs_action: 'Clear',
     clear_logs_success: 'Logs cleared',
     log_viewer_desc: 'Real-time log streaming with level filtering',
+    log_mode_live: 'Live',
+    log_mode_history: 'History',
     log_level_filter: 'Level filter',
     log_filter_no_match: 'No logs match the current filter. Try switching levels.',
     log_level_all: 'All',
@@ -3621,6 +3637,40 @@ const currentMatchIndex = ref({}) // { service: 当前匹配在 searchMatches �
 const logPaused = ref(false)
 const logSearch = ref('')
 const logLevelFilter = ref('ALL')
+// 新增：保留实时日志的最大行数，防止内存飙升
+const LIVE_LOG_LIMIT = 5000
+// 新增：时间范围选择（仅用于历史查询）
+const logTimeRange = ref('all') // '1h','6h','24h','all'
+const logTimeRangeOptions = [
+  { value: '1h', label: computed(() => t('range_1h')) },
+  { value: '6h', label: computed(() => t('range_6h')) },
+  { value: '24h', label: computed(() => t('range_24h')) },
+  { value: 'all', label: computed(() => t('range_all')) },
+]
+
+// 辅助：HTML 转义与高亮匹配
+const escapeHtml = (str) => {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const highlightText = (text) => {
+  if (!text) return ''
+  const raw = escapeHtml(text)
+  const kw = logSearch.value
+  if (!kw) return raw
+  try {
+    const re = new RegExp(escapeRegExp(kw), 'gi')
+    return raw.replace(re, (m) => `<mark class="bg-yellow-300 text-black dark:bg-yellow-500 dark:text-black">${m}</mark>`)
+  } catch (e) {
+    return raw
+  }
+}
 const logLevelFilters = [
   { value: 'ALL',     label: computed(() => t('log_level_all')),  activeClass: 'bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-sm' },
   { value: 'ERROR',   label: 'ERR',      activeClass: 'bg-red-500/90 text-white shadow-sm' },
@@ -3628,6 +3678,30 @@ const logLevelFilters = [
   { value: 'INFO',    label: 'INFO',     activeClass: 'bg-green-500/90 text-white shadow-sm' },
   { value: 'DEBUG',   label: 'DBG',      activeClass: 'bg-blue-500/90 text-white shadow-sm' },
 ]
+// 日志模式: 'live' | 'history'
+const logMode = ref('live')
+const logModeLabel = computed(() => logMode.value === 'live' ? t('log_mode_live') : t('log_mode_history'))
+
+const setLogMode = (mode) => {
+  if (!['live', 'history'].includes(mode)) return
+  if (logMode.value === mode) return
+  logMode.value = mode
+  const svc = selectedService.value
+  if (!svc) return
+  if (mode === 'live') {
+    // switch to live: clear current page logs and connect websocket
+    logs.value[svc] = []
+    connectLogWebSocket(svc)
+  } else {
+    // switch to history: close websocket and load historical logs
+    if (logSocket) {
+      logSocket.close()
+      logSocket = null
+      logSocketService = null
+    }
+    loadLogs(svc)
+  }
+}
 const lastUpdated = ref('')
 const controlling = ref(false)
 const notification = ref(null)
@@ -4863,12 +4937,17 @@ const closeMetrics = () => {
 
 // 监听 selectedService 变化，用于管理 WebSocket 连接
 watch(selectedService, (newService, oldService) => {
+  logLevelFilter.value = 'ALL'
   if (newService) {
-    // 如果打开了新的日志窗口，则连接
-    logLevelFilter.value = 'ALL'
-    connectLogWebSocket(newService)
+    if (logMode.value === 'live') {
+      // 实时模式连接 WebSocket
+      connectLogWebSocket(newService)
+    } else {
+      // 历史模式拉取日志
+      loadLogs(newService)
+    }
   } else if (oldService) {
-    // 如果关闭了日志窗口（从一个 service 变为 null）
+    // 关闭日志窗口（从一个 service 变为 null），关闭 websocket
     if (logSocketReconnectTimer) {
       clearTimeout(logSocketReconnectTimer)
       logSocketReconnectTimer = null
@@ -4879,6 +4958,22 @@ watch(selectedService, (newService, oldService) => {
       logSocketService = null
       console.log(`WebSocket connection closed for ${oldService}`)
     }
+  }
+})
+// 监听日志模式变化，切换时进行必要的连接/加载
+watch(logMode, (mode) => {
+  const svc = selectedService.value
+  if (!svc) return
+  if (mode === 'live') {
+    logs.value[svc] = []
+    connectLogWebSocket(svc)
+  } else {
+    if (logSocket) {
+      logSocket.close()
+      logSocket = null
+      logSocketService = null
+    }
+    loadLogs(svc)
   }
 })
 
@@ -4907,11 +5002,14 @@ const filteredDisplayedLogs = computed(() => {
 const logLevelCounts = ref({ ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 })
 
 const getLogLevelCount = (level) => {
+  // 在实时模式下，全部从当前展示的日志中统计
+  if (logMode.value === 'live') {
+    return filteredDisplayedLogs.value.filter(l => l.level === level).length
+  }
+  // 历史模式下：INFO 使用当前展示（以便分页显示），其他级别使用后端全量统计
   if (level === 'INFO') {
-    // 只显示当前页面实际展示的 INFO 数
     return filteredDisplayedLogs.value.filter(l => l.level === 'INFO').length
   }
-  // 其他分级用后端全量统计
   return logLevelCounts.value[level] || 0
 }
 
@@ -4946,52 +5044,74 @@ watch(logSearch, (keyword) => {
   logSearchDebounceTimer = setTimeout(async () => {
     const service = selectedService.value
     if (!service) return
-    if (logSearchInProgress) return
-    logSearchInProgress = true
-    if (!logPaused.value) {
-      logPaused.value = true
-      if (logSocket && logSocket.readyState === 1) {
-        logSocket.send(JSON.stringify({ action: 'pause' }))
+    // 分模式处理搜索：历史模式走后端全量搜索，实时模式在本地流内搜索
+    if (logMode.value === 'history') {
+      if (logSearchInProgress) return
+      logSearchInProgress = true
+      if (!logPaused.value) {
+        logPaused.value = true
+        if (logSocket && logSocket.readyState === 1) {
+          logSocket.send(JSON.stringify({ action: 'pause' }))
+        }
       }
-    }
-    logsLoading.value[service] = true
-    try {
+      logsLoading.value[service] = true
+      try {
+        if (!keyword) {
+          searchMatches.value[service] = []
+          currentMatchIndex.value[service] = -1
+          logsLoading.value[service] = false
+          logSearchInProgress = false
+          return
+        }
+        // 单次API请求，lines=all，带分级参数
+        const params = new URLSearchParams({ service, lines: 'all', offset: '0', search: keyword })
+        if (["ERROR", "WARNING", "DEBUG"].includes(logLevelFilter.value)) {
+          params.set('level', logLevelFilter.value)
+        }
+        const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+        if (!response.ok) throw new Error('Failed to search logs')
+        const data = await response.json()
+        logs.value[service] = data.logs
+        logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
+        // 记录所有匹配行号
+        const matches = []
+        data.logs.forEach((log) => {
+          if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
+            if (typeof log.line === 'number') {
+              matches.push(log.line - 1)
+            }
+          }
+        })
+        searchMatches.value[service] = matches
+        currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
+        await nextTick()
+        scrollLogsToTop()
+      } catch (e) {
+        console.error('Search logs error:', e)
+        showNotification(t('search_failed'), 'error')
+      } finally {
+        logsLoading.value[service] = false
+        logSearchInProgress = false
+      }
+    } else {
+      // 实时模式：本地匹配当前已接收的 logs
       if (!keyword) {
         searchMatches.value[service] = []
         currentMatchIndex.value[service] = -1
         logsLoading.value[service] = false
-        logSearchInProgress = false
         return
       }
-      // 单次API请求，lines=all，带分级参数
-      const params = new URLSearchParams({ service, lines: 'all', offset: '0', search: keyword })
-      if (["ERROR", "WARNING", "DEBUG"].includes(logLevelFilter.value)) {
-        params.set('level', logLevelFilter.value)
-      }
-      const response = await authorizedFetch(`/api/logs?${params.toString()}`)
-      if (!response.ok) throw new Error('Failed to search logs')
-      const data = await response.json()
-      logs.value[service] = data.logs
-      logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
-      // 记录所有匹配行号
       const matches = []
-      data.logs.forEach((log) => {
+      const list = logs.value[service] || []
+      list.forEach((log) => {
         if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-          if (typeof log.line === 'number') {
-            matches.push(log.line - 1)
-          }
+          if (typeof log.line === 'number') matches.push(log.line - 1)
         }
       })
       searchMatches.value[service] = matches
       currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
       await nextTick()
-      scrollLogsToTop()
-    } catch (e) {
-      console.error('Search logs error:', e)
-      showNotification(t('search_failed'), 'error')
-    } finally {
-      logsLoading.value[service] = false
-      logSearchInProgress = false
+      if (matches.length > 0) jumpToLogLine(matches[0])
     }
   }, 500)
 })
@@ -5008,7 +5128,7 @@ const goBackToLastPosition = async () => {
   if (!last) return
   logsLoading.value[service] = true
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${last.offset}`)
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${last.offset}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     logs.value[service] = data.logs
@@ -5152,7 +5272,7 @@ const loadLogs = async (service) => {
   logHasMoreNext.value[service] = false
   try {
     // 初始加载最新200行
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200`)
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     logs.value[service] = data.logs
@@ -5170,6 +5290,11 @@ const loadLogs = async (service) => {
   } finally {
     logsLoading.value[service] = false
   }
+}
+
+// 日志API range参数辅助
+const toRangeQuery = () => {
+  return (logMode.value === 'history' && logTimeRange.value && logTimeRange.value !== 'all') ? `&range=${encodeURIComponent(logTimeRange.value)}` : ''
 }
 
 // 无限滚动加载更多日志
@@ -5191,7 +5316,7 @@ const fetchMoreLogs = async (direction = 'prev') => {
     return
   }
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${fetchOffset}`)
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${fetchOffset}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     if (direction === 'prev') {
