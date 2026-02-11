@@ -4981,6 +4981,8 @@ watch(logMode, (mode) => {
   if (mode === 'live') {
     logs.value[svc] = []
     connectLogWebSocket(svc)
+    // live mode - ensure not paused by default
+    logPaused.value = false
   } else {
     if (logSocket) {
       logSocket.close()
@@ -4990,8 +4992,8 @@ watch(logMode, (mode) => {
     // 切换到历史模式，加载最近日志并刷新分级统计
     loadLogs(svc)
     fetchLogLevelCounts(svc)
-    // 历史模式不应处于 paused 状态
-    logPaused.value = false
+    // 历史模式默认暂停监控
+    logPaused.value = true
   }
 })
 
@@ -5493,6 +5495,14 @@ const goToBottom = async (options = {}) => {
   const service = selectedService.value
   if (!service) return
   const { keepPaused = false } = options
+  // Live mode: simply scroll to bottom of current displayed logs (respect current level filter) without fetching
+  if (logMode.value === 'live') {
+    await nextTick()
+    if (!logsContainer.value) return
+    // scroll to bottom of displayed (filtered) logs
+    logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+    return
+  }
   if (!keepPaused && !logPaused.value) {
     logPaused.value = true
     if (logSocket && logSocket.readyState === 1) {
@@ -5501,7 +5511,8 @@ const goToBottom = async (options = {}) => {
   }
   logsLoading.value[service] = true
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200`)
+    const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${lvl}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     logs.value[service] = data.logs
@@ -5523,6 +5534,13 @@ const goToBottom = async (options = {}) => {
 const goToTop = async () => {
   const service = selectedService.value
   if (!service) return
+  // Live mode: scroll to top of currently displayed logs
+  if (logMode.value === 'live') {
+    await nextTick()
+    if (!logsContainer.value) return
+    logsContainer.value.scrollTop = 0
+    return
+  }
   if (!logPaused.value) {
     logPaused.value = true
     if (logSocket && logSocket.readyState === 1) {
@@ -5531,7 +5549,8 @@ const goToTop = async () => {
   }
   logsLoading.value[service] = true
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=0`)
+    const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=0${lvl}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     logs.value[service] = data.logs
