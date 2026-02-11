@@ -5290,6 +5290,11 @@ const loadLogs = async (service) => {
   logHasMorePrev.value[service] = false
   logHasMoreNext.value[service] = false
   try {
+    // If a non-ALL level is selected, load recent 200 lines for that level
+    if (logLevelFilter.value && logLevelFilter.value !== 'ALL') {
+      await fetchLogsByLevel(logLevelFilter.value)
+      return
+    }
     // 初始加载最新200行
     const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
