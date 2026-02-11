@@ -1289,8 +1289,9 @@
             </button>
           </div>
 
-          <!-- Stream control -->
+          <!-- Stream control (only in live mode) -->
           <button
+            v-if="logMode === 'live'"
             @click="togglePause"
             class="px-2 py-1 rounded text-[11px] font-medium transition inline-flex items-center gap-1"
             :class="logPaused ? 'bg-green-600/90 text-white hover:bg-green-700' : 'bg-blue-600/90 text-white hover:bg-blue-700'"
@@ -2387,19 +2388,32 @@ const onLogLevelClick = (level) => {
   }
 }
 
-// 新增：按分级拉取日志
+// 新增：按分级拉取日志（历史模式下仅取最后200条，统计仍使用后端总数）
 const fetchLogsByLevel = async (level) => {
   const service = selectedService.value
   if (!service) return
   logsLoading.value[service] = true
   try {
-    const params = new URLSearchParams({ service, lines: 'all', offset: '0', level })
-    const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+    // 请求后端返回最近 200 条该级别日志，并依赖后端返回的 total 来显示真实数量
+    const params = new URLSearchParams({ service, lines: '200', offset: '-200', level })
+    const response = await authorizedFetch(`/api/logs?${params.toString()}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs by level')
     const data = await response.json()
-    logs.value[service] = data.logs
-    logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
+    // data.logs 为最近200条匹配日志，data.total 为匹配总数
+    logs.value[service] = data.logs || []
+    logsMeta.value[service] = { total: data.total || (data.logs||[]).length, offset: data.offset ?? 0 }
+    logOffset.value[service] = data.offset ?? 0
+    logHasMorePrev.value[service] = data.has_more_prev ?? false
+    logHasMoreNext.value[service] = data.has_more_next ?? false
+    // 更新后端分级统计，确保按钮上显示真实数量
+    await fetchLogLevelCounts(service)
+    // 清除本地搜索匹配（级别切换通常会清除搜索）
+    searchMatches.value[service] = []
+    currentMatchIndex.value[service] = -1
+    await nextTick()
+    scrollLogsToBottom()
   } catch (e) {
+    console.error('fetchLogsByLevel error:', e)
     showNotification(t('logs_load_failed'), 'error')
   } finally {
     logsLoading.value[service] = false
@@ -4973,7 +4987,11 @@ watch(logMode, (mode) => {
       logSocket = null
       logSocketService = null
     }
+    // 切换到历史模式，加载最近日志并刷新分级统计
     loadLogs(svc)
+    fetchLogLevelCounts(svc)
+    // 历史模式不应处于 paused 状态
+    logPaused.value = false
   }
 })
 
@@ -5002,15 +5020,12 @@ const filteredDisplayedLogs = computed(() => {
 const logLevelCounts = ref({ ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 })
 
 const getLogLevelCount = (level) => {
-  // 在实时模式下，全部从当前展示的日志中统计
-  if (logMode.value === 'live') {
-    return filteredDisplayedLogs.value.filter(l => l.level === level).length
+  // 历史模式：始终使用后端全量统计，确保数量真实
+  if (logMode.value === 'history') {
+    return logLevelCounts.value[level] || 0
   }
-  // 历史模式下：INFO 使用当前展示（以便分页显示），其他级别使用后端全量统计
-  if (level === 'INFO') {
-    return filteredDisplayedLogs.value.filter(l => l.level === 'INFO').length
-  }
-  return logLevelCounts.value[level] || 0
+  // 实时模式：使用当前展示数据统计
+  return filteredDisplayedLogs.value.filter(l => l.level === level).length
 }
 
 // 拉取后端分级统计
@@ -5162,12 +5177,17 @@ const rememberCurrentPosition = () => {
 const jumpToLogLine = async (globalIndex) => {
   const service = selectedService.value
   if (!service) return
+  // 在历史模式，切换回全部视图并清除搜索
+  if (logMode.value === 'history') {
+    logLevelFilter.value = 'ALL'
+    logSearch.value = ''
+  }
   // 计算该行所在页的 offset
   const pageSize = 200
   const pageOffset = Math.floor(globalIndex / pageSize) * pageSize
   logsLoading.value[service] = true
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=${pageSize}&offset=${pageOffset}`)
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=${pageSize}&offset=${pageOffset}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     logs.value[service] = data.logs
@@ -5189,11 +5209,10 @@ const jumpToLogLine = async (globalIndex) => {
       const container = logsContainer.value
       const lineNode = container.children?.[localIndex]
       if (lineNode) {
-        const centerOffset = lineNode.offsetTop - (container.clientHeight / 2) + (lineNode.clientHeight / 2)
-        container.scrollTop = Math.max(centerOffset, 0)
+        try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) { const centerOffset = lineNode.offsetTop - (container.clientHeight / 2) + (lineNode.clientHeight / 2); container.scrollTop = Math.max(centerOffset, 0) }
       } else {
         const lineHeight = 18 // 估算每行高度（px）
-        container.scrollTop = Math.max(0, localIndex * lineHeight - (container.clientHeight / 2))
+        try { container.scrollTo({ top: Math.max(0, localIndex * lineHeight - (container.clientHeight / 2)), behavior: 'smooth' }) } catch (e) { container.scrollTop = Math.max(0, localIndex * lineHeight - (container.clientHeight / 2)) }
       }
     }
   } catch (e) {
