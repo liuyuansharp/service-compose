@@ -1243,7 +1243,7 @@
 
     <!-- Log Viewer Modal -->
     <div
-      v-if="selectedService"
+      v-show="selectedService"
       class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       @click.self="selectedService = null"
     >
@@ -2485,6 +2485,8 @@ const translations = {
     bottom: '底部',
     resume: '继续',
     pause: '暂停',
+    follow: '跟随',
+    following: '正在跟随',
     search_logs: '搜索日志',
     prev: '上一条',
     next: '下一条',
@@ -2779,6 +2781,8 @@ const translations = {
     bottom: 'Bottom',
     resume: 'Resume',
     pause: 'Pause',
+    follow: 'Follow',
+    following: 'Following',
     search_logs: 'Search logs',
     prev: 'Prev',
     next: 'Next',
@@ -3093,18 +3097,23 @@ const connectLogWebSocket = (service) => {
   logSocket.onmessage = (event) => {
     const data = JSON.parse(event.data)
     if (data.type === 'log') {
+      // 仅在 live 模式处理实时消息
+      if (logMode.value !== 'live') return
       // 新日志的行号 = offset + logs.length + 1
       const meta = logsMeta.value[service]
       const offset = meta ? (meta.offset || 0) : 0
       const curLen = logs.value[service]?.length || 0
       data.line = offset + curLen + 1
-      logs.value[service] = [...(logs.value[service] || []), data]
+      const arr = [...(logs.value[service] || []), data]
+      // 裁剪超过上限的旧条目
+      if (arr.length > LIVE_LOG_LIMIT) arr.splice(0, arr.length - LIVE_LOG_LIMIT)
+      logs.value[service] = arr
       if (logsMeta.value[service]) {
-        logsMeta.value[service].total = offset + curLen + 1
+        logsMeta.value[service].total = offset + arr.length
       } else {
-        logsMeta.value[service] = { total: offset + curLen + 1, offset }
+        logsMeta.value[service] = { total: offset + arr.length, offset }
       }
-      nextTick(scrollLogsToBottom)
+      if (followLogs.value && !logPaused.value) nextTick(scrollLogsToBottom)
     }
   }
   logSocket.onclose = () => {
@@ -3649,6 +3658,7 @@ const logLastPosition = ref({}) // { service: { offset, scrollTop } }
 const searchMatches = ref({}) // { service: [globalIndex1, globalIndex2, ...] }
 const currentMatchIndex = ref({}) // { service: 当前匹配在 searchMatches 数组中的下标 }
 const logPaused = ref(false)
+const followLogs = ref(true) // 当为 true 时，自动滚动到末尾（Live 模式）
 const logSearch = ref('')
 const logLevelFilter = ref('ALL')
 // 新增：保留实时日志的最大行数，防止内存飙升
@@ -3703,16 +3713,19 @@ const setLogMode = (mode) => {
   const svc = selectedService.value
   if (!svc) return
   if (mode === 'live') {
-    // switch to live: clear current page logs and connect websocket
-    logs.value[svc] = []
+    // 切回 live: 恢复实时接收，但保持当前查看位置不被重置
+    logPaused.value = false
+    followLogs.value = true
     connectLogWebSocket(svc)
   } else {
-    // switch to history: close websocket and load historical logs
+    // 切到 history: 断开实时连接并进入暂停状态、关闭 follow
     if (logSocket) {
       logSocket.close()
       logSocket = null
       logSocketService = null
     }
+    logPaused.value = true
+    followLogs.value = false
     loadLogs(svc)
   }
 }
@@ -4949,31 +4962,21 @@ const closeMetrics = () => {
   }
 }
 
-// 监听 selectedService 变化，用于管理 WebSocket 连接
-watch(selectedService, (newService, oldService) => {
-  logLevelFilter.value = 'ALL'
-  if (newService) {
-    if (logMode.value === 'live') {
-      // 实时模式连接 WebSocket
-      connectLogWebSocket(newService)
-    } else {
-      // 历史模式拉取日志
-      loadLogs(newService)
-    }
-  } else if (oldService) {
-    // 关闭日志窗口（从一个 service 变为 null），关闭 websocket
-    if (logSocketReconnectTimer) {
-      clearTimeout(logSocketReconnectTimer)
-      logSocketReconnectTimer = null
-    }
+// 监听 selectedService 变化以便在 live 模式下建立 WebSocket 连接并在关闭时清理
+watch(selectedService, (service) => {
+  fetchLogLevelCounts(service)
+  if (!service) {
     if (logSocket) {
       logSocket.close()
       logSocket = null
       logSocketService = null
-      console.log(`WebSocket connection closed for ${oldService}`)
     }
+    return
   }
-})
+  if (logMode.value === 'live') {
+    connectLogWebSocket(service)
+  }
+}, { immediate: true })
 // 监听日志模式变化，切换时进行必要的连接/加载
 watch(logMode, (mode) => {
   const svc = selectedService.value
@@ -5044,10 +5047,7 @@ const fetchLogLevelCounts = async (service) => {
   }
 }
 
-// 监听服务切换自动拉取分级统计
-watch(selectedService, (service) => {
-  fetchLogLevelCounts(service)
-}, { immediate: true })
+// 服务切换处理已在上方的 watch(selectedService) 中处理（包含连接和统计）
 
 const totalLogs = computed(() => {
   return logs.value[selectedService.value]?.length || 0
@@ -5284,7 +5284,9 @@ const refreshStatus = async () => {
 
 const loadLogs = async (service) => {
   selectedService.value = service
-  logPaused.value = false
+  // history 模式默认暂停，live 模式默认不暂停并开启 follow
+  logPaused.value = (logMode.value === 'history')
+  if (logMode.value === 'live') followLogs.value = true
   logSearch.value = ''
   logsLoading.value[service] = true
   logs.value[service] = []
@@ -5420,8 +5422,12 @@ const togglePause = async () => {
   if (logSocket && logSocket.readyState === 1) { // 1: OPEN
     logSocket.send(JSON.stringify({ action: logPaused.value ? 'pause' : 'resume' }))
   }
-  // 恢复监控时默认回到日志末尾
-  if (!logPaused.value) {
+  if (logPaused.value) {
+    // 暂停时关闭跟随，方便查看历史
+    followLogs.value = false
+  } else {
+    // 恢复时打开跟随并滚到底部
+    followLogs.value = true
     await goToBottom({ keepPaused: true })
   }
 }
