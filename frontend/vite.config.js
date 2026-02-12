@@ -26,11 +26,23 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     minify: 'terser',
+    chunkSizeWarningLimit: 1000,
     terserOptions: {
       compress: {
         drop_console: true
       }
-    }
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('echarts')) return 'echarts'
+          if (id.includes('@xterm')) return 'xterm'
+          if (id.includes('vue')) return 'vue'
+          return 'vendor'
+        },
+      },
+    },
   },
   
   resolve: {

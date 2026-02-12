@@ -20,14 +20,14 @@ echo ""
 chmod +x examples/dummy_service.sh
 
 echo "Step 1: View configuration"
-echo "  Config file: examples/services_config_example.json"
+echo "  Config file: examples/services_config.json"
 echo ""
-cat examples/services_config_example.json | head -20
+cat examples/services_config.json | head -20
 echo "  ..."
 echo ""
 
 echo "Step 2: Start services with test config"
-echo "  Command: python3 manage_services.py start --config examples/services_config_example.json"
+echo "  Command: python3 manage_services.py start --config examples/services_config.json"
 echo "  This will:"
 echo "    - Start platform (runs for 60s)"
 echo "    - Wait 2s"
@@ -56,7 +56,7 @@ echo ""
 read -p "Ready to start? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    python3 manage_services.py start --config examples/services_config_example.json --daemon
+    python3 manage_services.py start --config examples/services_config.json --daemon
 else
     echo "Cancelled."
 fi

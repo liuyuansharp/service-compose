@@ -29,7 +29,9 @@
         "cron": "03:00@0,1",
         "last_restart": "2026-02-10T03:00:12.959573"
       },
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_B",
@@ -42,7 +44,9 @@
       "pidfile": "service_B.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_C",
@@ -55,7 +59,9 @@
       "pidfile": "service_C.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform", "service_B"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_D",
@@ -73,7 +79,9 @@
         "cron": "",
         "last_restart": null
       },
-      "depends_on": ["service_platform", "service_C"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_E",
@@ -86,7 +94,9 @@
       "pidfile": "service_E.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform", "service_D"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_F",
@@ -99,7 +109,9 @@
       "pidfile": "service_F.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_G",
@@ -112,7 +124,9 @@
       "pidfile": "service_G.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_H",
@@ -125,7 +139,9 @@
       "pidfile": "service_H.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     },
     {
       "name": "service_I",
@@ -138,7 +154,10 @@
       "pidfile": "service_I.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
-      "depends_on": ["service_platform"]
+      "depends_on": [
+        "service_platform"
+      ]
     }
-  ]
+  ],
+  "run_dir": "./examples/.services"
 }
