@@ -3836,6 +3836,7 @@ const setLogMode = (mode) => {
     logPaused.value = false
     followLogs.value = false
     loadLogs(svc)
+    fetchLogLevelCounts(svc)
   }
 }
 const lastUpdated = ref('')
@@ -5427,6 +5428,7 @@ const loadLogs = async (service) => {
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
     await nextTick()
+    await nextTick()
     scrollLogsToBottom()
   } catch (error) {
     console.error('Error loading logs:', error)
@@ -5638,6 +5640,7 @@ const goToBottom = async (options = {}) => {
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
     await nextTick()
+    await nextTick()  // 双 tick 确保 filteredDisplayedLogs → DOM 渲染完毕
     scrollLogsToBottom()
   } catch (e) {
     console.error('Go to bottom error:', e)
@@ -5672,6 +5675,7 @@ const goToTop = async () => {
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
     await nextTick()
+    await nextTick()
     scrollLogsToTop()
   } catch (e) {
     console.error('Go to top error:', e)
@@ -5683,13 +5687,24 @@ const goToTop = async () => {
 
 const scrollLogsToBottom = () => {
   if (logsContainer.value) {
+    // 先立即设一次，再等浏览器完成布局后再设一次，确保滚动条跟随到底
     logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+    requestAnimationFrame(() => {
+      if (logsContainer.value) {
+        logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+      }
+    })
   }
 }
 
 const scrollLogsToTop = () => {
   if (logsContainer.value) {
     logsContainer.value.scrollTop = 0
+    requestAnimationFrame(() => {
+      if (logsContainer.value) {
+        logsContainer.value.scrollTop = 0
+      }
+    })
   }
 }
 
