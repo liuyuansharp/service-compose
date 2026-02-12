@@ -275,11 +275,11 @@
             <div>
               <p class="text-gray-600 dark:text-slate-400 text-xs font-medium">{{ t('overall_status') }}</p>
               <p class="text-2xl font-semibold mt-2 flex items-center gap-2" :class="statusColor">
-                <span>{{ platformHealthLabel }}</span>
+                <span>{{ overallHealthLabel }}</span>
                 <span
-                  v-if="platformHealth === 'abnormal'"
+                  v-if="overallHealth === 'abnormal'"
                   class="inline-flex h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]"
-                  :title="getHealthTooltip(platformStatus)"
+                  :title="overallHealthTooltip"
                 ></span>
               </p>
             </div>
@@ -468,166 +468,81 @@
         </div>
       </div>
 
-      <!-- Platform Card -->
-  <div
-        v-if="isCardVisible('platform')"
-        id="platform-card"
-        class="tech-card rounded-md p-4 mb-6 border-t-4"
-    :class="[platformCardBorderClass, getHealthBgClass(platformHealth), isFocusedTarget('platform') ? 'service-focus' : '']"
-      >
-        <div class="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4 mb-4">
-          <div>
-            <h2 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('platform') }}</h2>
-            <p class="text-xs text-gray-600 dark:text-slate-400 mt-1">{{ t('platform_service') }}</p>
-          </div>
-          <div class="flex flex-wrap gap-2 sm:gap-3">
-            <button
-              v-if="platformStatus.running && canOperate"
-              @click="controlService('stop', 'platform')"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-              :disabled="controlling"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-              {{ t('stop') }}
-            </button>
-            <button
-              v-else-if="!platformStatus.running && canOperate"
-              @click="controlService('start', 'platform')"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-              :disabled="controlling"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 6l10 6-10 6z" />
-              </svg>
-              {{ t('start') }}
-            </button>
-            <button
-              @click="openServiceInfo('platform')"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 10v6" />
-                <path d="M12 7h.01" />
-              </svg>
-              {{ t('info') }}
-            </button>
-            <button
-              @click="openMetrics('platform')"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 18V6" />
-                <path d="M4 18h16" />
-                <path d="M7 14l4-4 3 3 5-6" />
-              </svg>
-              {{ t('metrics') }}
-            </button>
-            <button
-              @click="loadLogs('platform')"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M7 4h7l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                <path d="M9 12h6" />
-                <path d="M9 16h6" />
-              </svg>
-              {{ t('logs') }}
-            </button>
-            <button
-              v-if="platformLinkUrl"
-              @click="openPlatformLink"
-              class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2.5 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 sm:h-4 w-3.5 sm:w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10 14a4 4 0 0 1 0-6l2-2a4 4 0 0 1 6 6l-1.5 1.5" />
-                <path d="M14 10a4 4 0 0 1 0 6l-2 2a4 4 0 0 1-6-6L7.5 10" />
-              </svg>
-              {{ t('platform_link') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">{{ t('status') }}</p>
-            <p class="text-base font-semibold mt-1 flex items-center gap-2" :class="platformHealthTextClass">
-              <span>{{ platformHealthLabel }}</span>
-              <span
-                v-if="platformHealth === 'abnormal'"
-                class="inline-flex h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]"
-                :title="getHealthTooltip(platformStatus)"
-              ></span>
-            </p>
-          </div>
-          <div>
-            <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">PID</p>
-            <p class="text-base font-mono font-semibold mt-1 flex items-center gap-2">
-              <span>{{ platformStatus.pid || '—' }}</span>
-              <button
-                v-if="platformStatus.pid"
-                @click="openPidTree('platform')"
-                class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-1"
-                :title="t('pid_tree')"
-              >
-                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
-                  <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
-                </svg>
-                {{ t('pid_tree') }}
-              </button>
-            </p>
-            <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('uptime') }}: {{ platformUptimeDisplay }}</p>
-          </div>
-          <div class="sm:col-span-2">
-            <p class="text-gray-600 dark:text-slate-400 text-xs uppercase tracking-wider">{{ t('last_log') }}</p>
-            <p class="text-xs font-mono mt-1 text-gray-800 dark:text-slate-200 truncate">
-              {{ platformStatus.last_log || t('no_logs_yet') }}
-            </p>
-          </div>
-        </div>
-      </div>
-
       <!-- Services Grid -->
       <div class="mb-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
-          <div v-if="canOperate && visibleServices.length > 1" class="flex items-center gap-2">
-            <!-- 一键启动所有 -->
-            <button
-              @click="batchControlAll('start')"
-              :disabled="controlling || allServicesRunning"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition
-                     bg-emerald-600/90 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed
-                     glass-button-solid shadow-sm"
-              :title="t('batch_start_all')"
-            >
-              <!-- 播放/启动全部 icon -->
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="6 3 20 12 6 21 6 3" />
-              </svg>
-              <span>{{ t('batch_start_all') }}</span>
-            </button>
-            <!-- 一键停止所有 -->
-            <button
-              @click="batchControlAll('stop')"
-              :disabled="controlling || noServicesRunning"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition
-                     bg-red-600/90 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed
-                     glass-button-solid shadow-sm"
-              :title="t('batch_stop_all')"
-            >
-              <!-- 停止全部 icon -->
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
-              <span>{{ t('batch_stop_all') }}</span>
-            </button>
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <!-- Left: Title + count badge -->
+          <div class="flex items-center gap-2">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
+            <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              {{ visibleServices.length }}
+            </span>
+          </div>
+
+          <!-- Right: View toggle + divider + batch actions -->
+          <div class="flex items-center gap-1.5">
+            <!-- View toggle (icon tabs) -->
+            <div class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
+              <button
+                @click="serviceViewMode = 'list'"
+                class="p-1.5 rounded transition"
+                :class="serviceViewMode === 'list'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+                :title="t('list_view')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </button>
+              <button
+                @click="serviceViewMode = 'workflow'"
+                class="p-1.5 rounded transition"
+                :class="serviceViewMode === 'workflow'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+                :title="t('workflow_view')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="5" cy="12" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="19" cy="18" r="2" />
+                  <path d="M7 12h4l2-6h4" /><path d="M13 12l-2 6h4" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Divider -->
+            <div v-if="canOperate && visibleServices.length > 1" class="w-px h-5 bg-slate-200 dark:bg-slate-700/60 mx-0.5"></div>
+
+            <!-- Batch start / stop -->
+            <div v-if="canOperate && visibleServices.length > 1" class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5 gap-0.5">
+              <button
+                @click="batchControlAll('start')"
+                :disabled="controlling || allServicesRunning"
+                class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition
+                       text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30
+                       disabled:opacity-35 disabled:cursor-not-allowed"
+                :title="t('batch_start_all')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                <span class="hidden sm:inline">{{ t('batch_start_all') }}</span>
+              </button>
+              <div class="w-px h-4 bg-slate-200 dark:bg-slate-700/60"></div>
+              <button
+                @click="batchControlAll('stop')"
+                :disabled="controlling || noServicesRunning"
+                class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition
+                       text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30
+                       disabled:opacity-35 disabled:cursor-not-allowed"
+                :title="t('batch_stop_all')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                <span class="hidden sm:inline">{{ t('batch_stop_all') }}</span>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div v-if="serviceViewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div
             v-for="service in visibleServices"
             :key="service.name"
@@ -747,6 +662,17 @@
               </div>
             </div>
           </div>
+        </div>
+        <div v-else class="mt-3">
+          <WorkflowView
+            :graph="serviceGraph"
+            :dark="isDark"
+            :title="t('workflow_title')"
+            :subtitle="t('workflow_subtitle')"
+            :empty-label="serviceGraphLoading ? t('workflow_loading') : t('workflow_empty')"
+            :refresh-label="t('workflow_refresh')"
+            @refresh="loadServiceGraph"
+          />
         </div>
       </div>
       </div>
@@ -2320,6 +2246,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as echarts from 'echarts'
+import WorkflowView from './components/WorkflowView.vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -2615,6 +2542,14 @@ const translations = {
     last_log: '最后日志',
     no_logs_yet: '暂无日志',
     services: '服务列表',
+  list_view: '列表视图',
+  workflow_view: '工作流视图',
+  workflow_title: '服务依赖工作流',
+  workflow_subtitle: '可视化服务节点依赖关系',
+  workflow_empty: '暂无依赖关系数据',
+  workflow_loading: '正在加载工作流...',
+  workflow_refresh: '刷新',
+  workflow_load_failed: '工作流加载失败',
     history: '历史',
     range_1h: '近 1 小时',
     range_6h: '近 6 小时',
@@ -2920,6 +2855,14 @@ const translations = {
     last_log: 'Last Log',
     no_logs_yet: 'No logs yet',
     services: 'Services',
+  list_view: 'List view',
+  workflow_view: 'Workflow view',
+  workflow_title: 'Service Dependency Workflow',
+  workflow_subtitle: 'Visualize dependency relationships',
+  workflow_empty: 'No dependency data available',
+  workflow_loading: 'Loading workflow...',
+  workflow_refresh: 'Refresh',
+  workflow_load_failed: 'Failed to load workflow',
     history: 'History',
     range_1h: 'Last 1h',
     range_6h: 'Last 6h',
@@ -3226,8 +3169,7 @@ const setupDashboardSSE = () => {
   dashboardEventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
-      platformStatus.value = data.platform
-      mergeServicesData(data.services)
+      mergeServicesData(Array.isArray(data.services) ? data.services : [])
       systemMetrics.value = data.metrics
       lastUpdated.value = data.timestamp
       statusFetchedAt.value = Date.now()
@@ -3414,15 +3356,10 @@ const bootstrapSession = async () => {
 }
 
 // State
-const platformStatus = ref({
-  name: 'platform',
-  running: false,
-  health: 'stopped',
-  pid: null,
-  last_log: null
-})
-
 const servicesStatus = ref([])
+const serviceViewMode = ref('list') // 'list' | 'workflow'
+const serviceGraph = ref({ nodes: [], edges: [] })
+const serviceGraphLoading = ref(false)
 
 // ---- 服务卡片拖拽排序 ----
 const dragState = reactive({
@@ -3977,14 +3914,22 @@ const getHealthTooltip = (item) => {
   return ''
 }
 
-const platformHealth = computed(() => getHealthState(platformStatus.value))
-const platformHealthLabel = computed(() => getHealthLabel(platformHealth.value))
-const platformHealthTextClass = computed(() => getHealthTextClass(platformHealth.value))
-const platformCardBorderClass = computed(() => {
-  const health = platformHealth.value
-  if (health === 'running') return 'border-green-500 ring-1 ring-green-300/60'
-  if (health === 'abnormal') return 'border-yellow-500 ring-1 ring-yellow-300/60'
-  return 'border-slate-300 ring-1 ring-slate-200/70'
+const overallHealth = computed(() => {
+  if (!servicesStatus.value.length) return 'stopped'
+  let hasAbnormal = false
+  for (const service of servicesStatus.value) {
+    const health = getHealthState(service)
+    if (health === 'stopped') return 'stopped'
+    if (health === 'abnormal') hasAbnormal = true
+  }
+  return hasAbnormal ? 'abnormal' : 'running'
+})
+const overallHealthLabel = computed(() => getHealthLabel(overallHealth.value))
+const overallHealthTextClass = computed(() => getHealthTextClass(overallHealth.value))
+const overallHealthTooltip = computed(() => {
+  if (overallHealth.value !== 'abnormal') return ''
+  const abnormalService = servicesStatus.value.find(s => getHealthState(s) === 'abnormal')
+  return abnormalService ? getHealthTooltip(abnormalService) : t('abnormal')
 })
 
 const getServiceHealthLabel = (service) => getHealthLabel(getHealthState(service))
@@ -3993,14 +3938,6 @@ const getServiceBorderClass = (service) => getHealthBorderClass(getHealthState(s
 
 const statusAlerts = computed(() => {
   const items = []
-  const platformHealth = getHealthState(platformStatus.value)
-  if (platformStatus.value?.health && platformHealth !== 'running' && isCardVisible('platform')) {
-    items.push({
-      key: 'platform',
-      name: t('platform'),
-      health: platformHealth
-    })
-  }
   servicesStatus.value.forEach((service) => {
     const health = getHealthState(service)
     if (health !== 'running' && isCardVisible('service:' + service.name)) {
@@ -4041,7 +3978,7 @@ const focusAlertTarget = async (alert) => {
   }, 4000)
 
   await nextTick()
-  const targetId = alert.key === 'platform' ? 'platform-card' : serviceCardId(alert.name)
+  const targetId = serviceCardId(alert.name)
   const target = typeof document !== 'undefined' ? document.getElementById(targetId) : null
   if (target?.scrollIntoView) {
     target.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -4178,7 +4115,6 @@ const visibleServices = computed(() => {
 const allCardOptions = computed(() => {
   const opts = [
     { value: 'overview', label: t('card_overview'), desc: t('card_overview_desc') },
-    { value: 'platform', label: t('card_platform'), desc: t('card_platform_desc') },
   ]
   for (const s of servicesStatus.value) {
     opts.push({ value: 'service:' + s.name, label: s.name, desc: t('card_service_desc', { name: s.name }) })
@@ -4575,14 +4511,14 @@ const formattedTimestamp = computed(() => {
 })
 
 const overallStatusBorder = computed(() => {
-  const health = platformHealth.value
+  const health = overallHealth.value
   if (health === 'running') return 'border-green-500'
   if (health === 'abnormal') return 'border-yellow-500'
   return 'border-red-500'
 })
 
 const statusColor = computed(() => {
-  return platformHealthTextClass.value
+  return overallHealthTextClass.value
 })
 
 const getCpuColor = computed(() => {
@@ -4634,13 +4570,6 @@ const formatDuration = (totalSeconds) => {
 }
 
 
-const platformUptimeDisplay = computed(() => {
-  const base = platformStatus.value?.uptime_seconds
-  if (base == null) return platformStatus.value?.uptime || '—'
-  const elapsed = Math.floor((Date.now() - statusFetchedAt.value) / 1000)
-  return formatDuration(base + Math.max(elapsed, 0))
-})
-
 const getServiceUptimeDisplay = (service) => {
   const base = service?.uptime_seconds
   if (base == null) return service?.uptime || '—'
@@ -4685,9 +4614,7 @@ const loadServiceInfo = async (serviceName) => {
     if (!response.ok) throw new Error('Failed to load info')
     const data = await response.json()
     // Merge scheduled_restart from SSE status data
-    const statusData = serviceName === 'platform'
-      ? platformStatus.value
-      : servicesStatus.value.find(s => s.name === serviceName)
+    const statusData = servicesStatus.value.find(s => s.name === serviceName)
     if (statusData?.scheduled_restart) {
       data.scheduled_restart = statusData.scheduled_restart
     }
@@ -4709,9 +4636,7 @@ const openServiceInfo = async (serviceName) => {
   selectedBackup.value = ''
   currentSchedNext.value = null
   // Init schedForm from SSE status data
-  const statusData = serviceName === 'platform'
-    ? platformStatus.value
-    : servicesStatus.value.find(s => s.name === serviceName)
+  const statusData = servicesStatus.value.find(s => s.name === serviceName)
   const sr = statusData?.scheduled_restart
   if (sr && sr.enabled) {
     schedForm.enabled = true
@@ -5494,8 +5419,7 @@ const refreshStatus = async () => {
     if (!response.ok) throw new Error('Failed to fetch status')
     
     const data = await response.json()
-    platformStatus.value = data.platform
-    mergeServicesData(data.services)
+    mergeServicesData(Array.isArray(data.services) ? data.services : [])
     systemMetrics.value = data.metrics
     lastUpdated.value = data.timestamp
   statusFetchedAt.value = Date.now()
@@ -5509,8 +5433,7 @@ const refreshStatus = async () => {
       if (!response.ok) throw new Error('Failed to fetch status')
       
       const data = await response.json()
-      platformStatus.value = data.platform
-      mergeServicesData(data.services)
+    mergeServicesData(Array.isArray(data.services) ? data.services : [])
       lastUpdated.value = data.timestamp
   statusFetchedAt.value = Date.now()
   statusTicker.value = Date.now()
@@ -5520,6 +5443,32 @@ const refreshStatus = async () => {
     }
   }
 }
+
+const loadServiceGraph = async () => {
+  serviceGraphLoading.value = true
+  try {
+    const response = await authorizedFetch('/api/services/graph')
+    if (!response.ok) throw new Error('Failed to fetch graph')
+    const data = await response.json()
+    serviceGraph.value = {
+      nodes: Array.isArray(data.nodes) ? data.nodes : [],
+      edges: Array.isArray(data.edges) ? data.edges : []
+    }
+  } catch (error) {
+    console.error('Error loading service graph:', error)
+    showNotification(t('workflow_load_failed'), 'error')
+  } finally {
+    serviceGraphLoading.value = false
+  }
+}
+
+watch(serviceViewMode, (mode) => {
+  if (mode === 'workflow' && !serviceGraphLoading.value) {
+    if (!serviceGraph.value?.nodes?.length) {
+      loadServiceGraph()
+    }
+  }
+})
 
 const loadLogs = async (service) => {
   selectedService.value = service

@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 from datetime import datetime
 
+from backend.config import topological_sort
+
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / 'services_config.json'
 LOGS_DIR = ROOT / 'logs'
@@ -254,21 +256,20 @@ class ServiceProcess:
 
 
 class Manager:
-    """Manages platform and services."""
+    """Manages services (unified, no platform distinction)."""
     
     def __init__(self, config_path=CONFIG_PATH):
         self.config_path = Path(config_path)
         self.logger = setup_logger('Manager', str(LOGS_DIR / 'manager.log'))
         self._load_config()
-        self.platform = None
         self.services = []
+        self.services_map = {}
 
     def _load_config(self):
         """Load configuration from JSON file."""
         try:
             with open(self.config_path) as f:
                 cfg = json.load(f)
-            self.platform_cfg = cfg['platform']
             self.services_cfg = cfg.get('services', [])
             self.logger.info(f"Loaded config from {self.config_path}")
         except Exception as e:
@@ -276,19 +277,9 @@ class Manager:
             raise
 
     def setup(self):
-        """Initialize platform and service objects."""
-        p = self.platform_cfg
-        self.platform = ServiceProcess(
-            'platform',
-            p['cmd'],
-            p.get('args', []),
-            p.get('log', 'platform.log'),
-            p.get('pidfile', 'platform.pid'),
-            p.get('restart_on_exit', True)
-        )
-        self.logger.info("Platform service initialized")
-        
+        """Initialize service objects."""
         self.services = []
+        self.services_map = {}
         for s in self.services_cfg:
             sp = ServiceProcess(
                 s.get('name'),
@@ -299,63 +290,54 @@ class Manager:
                 s.get('restart_on_exit', True)
             )
             self.services.append(sp)
+            self.services_map[sp.name] = sp
         self.logger.info(f"Initialized {len(self.services)} services")
 
+    def _get_start_levels(self):
+        """Return ordered start levels based on dependency graph."""
+        try:
+            return topological_sort({"services": self.services_cfg})
+        except Exception as e:
+            self.logger.error(f"Dependency graph error: {e}")
+            # Fallback: all services in one level
+            return [[s.get('name') for s in self.services_cfg]]
+
     def start_all(self):
-        """Start platform first, then services in parallel."""
+        """Start all services in dependency order (topological levels)."""
         self.logger.info("=" * 60)
-        self.logger.info("Starting platform and services")
+        self.logger.info("Starting all services")
         self.logger.info("=" * 60)
-        
-        # Start platform and wait for it to initialize
-        self.logger.info("Starting platform (priority service)...")
-        self.platform.start()
-        
-        # Wait for platform to be healthy (simple sleep for now)
-        self.logger.info("Waiting 2s for platform to initialize...")
-        time.sleep(2)
-        
-        # Start services in parallel
-        self.logger.info(f"Starting {len(self.services)} services in parallel...")
-        for s in self.services:
-            s.start()
-        
+        levels = self._get_start_levels()
+        for idx, level in enumerate(levels):
+            self.logger.info(f"Starting level {idx + 1}/{len(levels)}: {', '.join(level)}")
+            for name in level:
+                svc = self.services_map.get(name)
+                if svc:
+                    svc.start()
+            # Small delay between levels to allow dependencies to come up
+            time.sleep(1)
+
         self.logger.info("All services started")
 
     def stop_all(self):
-        """Stop all services and platform."""
+        """Stop all services in reverse dependency order."""
         self.logger.info("=" * 60)
-        self.logger.info("Stopping all services and platform")
+        self.logger.info("Stopping all services")
         self.logger.info("=" * 60)
-        
-        self.logger.info("Stopping services...")
-        for s in self.services:
-            s.stop()
-        
-        self.logger.info("Stopping platform...")
-        self.platform.stop()
-        
+
+        levels = self._get_start_levels()
+        # Stop in reverse dependency order
+        for idx, level in enumerate(reversed(levels)):
+            self.logger.info(f"Stopping level {len(levels) - idx}/{len(levels)}: {', '.join(level)}")
+            for name in level:
+                svc = self.services_map.get(name)
+                if svc:
+                    svc.stop()
+
         self.logger.info("All stopped")
 
-    def start_platform(self):
-        """Start only platform service."""
-        self.logger.info("=" * 60)
-        self.logger.info("Starting platform")
-        self.logger.info("=" * 60)
-        self.platform.start()
-
-    def stop_platform(self):
-        """Stop only platform service."""
-        self.logger.info("=" * 60)
-        self.logger.info("Stopping platform")
-        self.logger.info("=" * 60)
-        self.platform.stop()
-
     def _get_service(self, name: str):
-        for s in self.services:
-            if s.name == name:
-                return s
-        return None
+        return self.services_map.get(name)
 
     def start_service(self, name: str):
         """Start only a single service by name."""
@@ -377,12 +359,6 @@ class Manager:
         self.logger.info("=" * 60)
         svc.stop()
 
-    def restart_platform(self):
-        """Restart only platform."""
-        self.stop_platform()
-        time.sleep(1)
-        self.start_platform()
-
     def restart_service(self, name: str):
         """Restart only a single service."""
         self.stop_service(name)
@@ -395,9 +371,6 @@ class Manager:
         print("\n" + "=" * 60)
         print("Service Status")
         print("=" * 60)
-        
-        pstatus = 'RUNNING' if self.platform.is_running() else 'STOPPED'
-        print(f"Platform: {pstatus:10s} (restarts: {self.platform.restart_count})")
         
         for s in self.services:
             status = 'RUNNING' if s.is_running() else 'STOPPED'
@@ -490,7 +463,7 @@ def run_monitor_forever(mgr: Manager, scope_label: str, pidfile: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Manage platform and services with auto-restart and logging'
+    description='Manage services with auto-restart and logging'
     )
     parser.add_argument(
         'action',
@@ -501,11 +474,6 @@ def main():
         '--service',
         default=None,
         help='Operate on a single service (e.g. service_A). If omitted, operates on all services.'
-    )
-    parser.add_argument(
-        '--platform',
-        action='store_true',
-        help='Operate only on platform service (mutually exclusive with --service).'
     )
     parser.add_argument(
         '--daemon',
@@ -523,28 +491,8 @@ def main():
         mgr = Manager(args.config)
         mgr.setup()
 
-        if args.platform and args.service:
-            raise ValueError("--platform and --service cannot be used together")
-
         if args.action == 'status':
             mgr.status()
-            return
-
-        # Scoped operations
-        if args.platform:
-            if args.action == 'start':
-                mgr.start_platform()
-                if args.daemon:
-                    run_monitor_forever(mgr, 'platform', LOGS_DIR / 'manager-platform.pid')
-            elif args.action == 'stop':
-                # stop platform service itself
-                mgr.stop_platform()
-                # also stop daemonized platform manager if exists
-                _stop_manager_daemon(LOGS_DIR / 'manager-platform.pid', mgr.logger)
-            elif args.action == 'restart':
-                mgr.restart_platform()
-                if args.daemon:
-                    run_monitor_forever(mgr, 'platform', LOGS_DIR / 'manager-platform.pid')
             return
 
         if args.service:

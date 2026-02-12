@@ -120,7 +120,7 @@ print_header "Starting Services"
 if [ "$FRONTEND_ONLY" = false ]; then
     print_info "Starting backend server..."
     cd "$SCRIPT_DIR"
-    python3 dashboard_api.py --host 0.0.0.0 --port 8080 &
+    python3 -m backend.app --host 0.0.0.0 --port 8080 &
     BACKEND_PID=$!
     sleep 2
     

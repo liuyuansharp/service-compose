@@ -1,16 +1,18 @@
 {
-  "platform": {
-    "cmd": "./examples/dummy_service.sh",
-    "args": [
-      "platform",
-      "1000"
-    ],
-    "log": "platform.log",
-    "pidfile": "platform.pid",
-    "restart_on_exit": true,
-    "heartbeat": "mock"
-  },
   "services": [
+    {
+      "name": "service_platform",
+      "cmd": "./examples/dummy_service.sh",
+      "args": [
+        "service_platform",
+        "1000"
+      ],
+      "log": "service_platform.log",
+      "pidfile": "service_platform.pid",
+      "restart_on_exit": true,
+      "heartbeat": "mock",
+      "depends_on": []
+    },
     {
       "name": "service_A",
       "cmd": "./examples/dummy_service.sh",
@@ -26,7 +28,8 @@
         "enabled": true,
         "cron": "03:00@0,1",
         "last_restart": "2026-02-10T03:00:12.959573"
-      }
+      },
+      "depends_on": ["service_platform"]
     },
     {
       "name": "service_B",
@@ -38,7 +41,8 @@
       "log": "service_B.log",
       "pidfile": "service_B.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform"]
     },
     {
       "name": "service_C",
@@ -50,7 +54,8 @@
       "log": "service_C.log",
       "pidfile": "service_C.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform", "service_B"]
     },
     {
       "name": "service_D",
@@ -67,7 +72,8 @@
         "enabled": false,
         "cron": "",
         "last_restart": null
-      }
+      },
+      "depends_on": ["service_platform", "service_C"]
     },
     {
       "name": "service_E",
@@ -79,7 +85,8 @@
       "log": "service_E.log",
       "pidfile": "service_E.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform", "service_D"]
     },
     {
       "name": "service_F",
@@ -91,7 +98,8 @@
       "log": "service_F.log",
       "pidfile": "service_F.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform"]
     },
     {
       "name": "service_G",
@@ -103,7 +111,8 @@
       "log": "service_G.log",
       "pidfile": "service_G.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform"]
     },
     {
       "name": "service_H",
@@ -115,7 +124,8 @@
       "log": "service_H.log",
       "pidfile": "service_H.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform"]
     },
     {
       "name": "service_I",
@@ -127,7 +137,8 @@
       "log": "service_I.log",
       "pidfile": "service_I.pid",
       "restart_on_exit": true,
-      "heartbeat": "mock"
+      "heartbeat": "mock",
+      "depends_on": ["service_platform"]
     }
   ]
 }
