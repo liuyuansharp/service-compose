@@ -1,13 +1,37 @@
 <template>
   <div class="workflow-wrapper">
-    <!-- Empty state -->
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-xs text-gray-500 dark:text-slate-400">
+        <span v-if="!levels.length">{{ emptyLabel }}</span>
+      </div>
+      <div v-if="levels.length" class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
+        <button
+          @click="viewMode = 'topo'"
+          class="px-2 py-1 text-xs rounded transition"
+          :class="viewMode === 'topo'
+            ? 'bg-blue-600 text-white shadow-sm'
+            : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+        >
+          {{ topoLabel }}
+        </button>
+        <button
+          @click="viewMode = 'force'"
+          class="px-2 py-1 text-xs rounded transition"
+          :class="viewMode === 'force'
+            ? 'bg-blue-600 text-white shadow-sm'
+            : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+        >
+          {{ forceLabel }}
+        </button>
+      </div>
+    </div>
+
     <div v-if="!levels.length" class="text-sm text-gray-500 dark:text-slate-400 py-10 text-center">
       {{ emptyLabel }}
     </div>
 
     <!-- Topology layout -->
-    <div v-else class="relative overflow-x-auto pb-4">
-      <!-- SVG connector layer (positioned behind cards) -->
+    <div v-show="levels.length && viewMode === 'topo'" class="relative overflow-x-auto pb-4">
       <svg
         class="absolute inset-0 pointer-events-none"
         :width="svgWidth"
@@ -30,7 +54,6 @@
         />
       </svg>
 
-      <!-- Card levels (rows) -->
       <div class="relative" style="z-index: 1;">
         <div
           v-for="(level, levelIdx) in levels"
@@ -48,7 +71,6 @@
               getHealthBgClass(getHealthState(getServiceData(nodeName))),
             ]"
           >
-            <!-- Card header: name + status + actions -->
             <div class="flex justify-between items-start mb-2.5">
               <div class="min-w-0 flex-1">
                 <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{{ nodeName }}</h4>
@@ -63,7 +85,6 @@
                   <span>{{ getServiceHealthLabel(getServiceData(nodeName)) }}</span>
                 </p>
               </div>
-              <!-- Compact action buttons -->
               <div class="flex items-center gap-1 ml-2 flex-shrink-0">
                 <button
                   v-if="getServiceData(nodeName).running && canOperate"
@@ -107,7 +128,6 @@
               </div>
             </div>
 
-            <!-- Card body: PID / uptime / depends -->
             <div class="space-y-1.5 text-[11px]">
               <div class="flex items-center justify-between">
                 <span class="text-gray-500 dark:text-slate-400">PID</span>
@@ -137,11 +157,17 @@
         </div>
       </div>
     </div>
+
+    <!-- Force-directed graph -->
+    <div v-show="levels.length && viewMode === 'force'" class="relative">
+      <div ref="chartRef" class="workflow-force-chart"></div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, onMounted, onUpdated, onBeforeUnmount, nextTick, watch } from 'vue'
+import * as echarts from 'echarts'
 
 const props = defineProps({
   graph: { type: Object, default: () => ({ nodes: [], edges: [] }) },
@@ -150,14 +176,14 @@ const props = defineProps({
   emptyLabel: { type: String, default: '' },
   canOperate: { type: Boolean, default: false },
   controlling: { type: Boolean, default: false },
-  // Button labels
   startLabel: { type: String, default: 'Start' },
   stopLabel: { type: String, default: 'Stop' },
   infoLabel: { type: String, default: 'Info' },
   metricsLabel: { type: String, default: 'Metrics' },
   logsLabel: { type: String, default: 'Logs' },
   uptimeLabel: { type: String, default: 'Uptime' },
-  // Health helper functions passed from parent
+  topoLabel: { type: String, default: 'Topology' },
+  forceLabel: { type: String, default: 'Force' },
   getHealthState: { type: Function, default: () => () => 'stopped' },
   getServiceHealthLabel: { type: Function, default: () => () => '' },
   getServiceHealthTextClass: { type: Function, default: () => () => '' },
@@ -167,7 +193,8 @@ const props = defineProps({
 
 defineEmits(['control', 'open-info', 'open-metrics', 'open-logs'])
 
-// Build a name→service lookup from the live services array
+const viewMode = ref('topo')
+
 const serviceMap = computed(() => {
   const m = new Map()
   for (const s of props.services) {
@@ -178,7 +205,6 @@ const serviceMap = computed(() => {
 
 const getServiceData = (name) => serviceMap.value.get(name) || { name, running: false, pid: null, uptime: null, health: 'stopped' }
 
-// Dependency info per node from graph data
 const nodeDepsMap = computed(() => {
   const m = {}
   for (const n of (props.graph?.nodes || [])) {
@@ -193,14 +219,13 @@ const isDepRunning = (name) => {
   return svc ? props.getHealthState(svc) === 'running' : false
 }
 
-// ---- Topological leveling (Kahn's algorithm) ----
 const levels = computed(() => {
   const nodes = props.graph?.nodes || []
   if (!nodes.length) return []
 
   const names = new Set(nodes.map(n => n.id))
-  const deps = {} // name → [deps]
-  const revDeps = {} // name → [dependents]
+  const deps = {}
+  const revDeps = {}
   const inDeg = {}
 
   for (const n of nodes) {
@@ -232,7 +257,6 @@ const levels = computed(() => {
     ready = next.sort()
   }
 
-  // Append any remaining nodes (cycle fallback)
   if (visited < names.size) {
     const placed = new Set(result.flat())
     const rest = [...names].filter(n => !placed.has(n)).sort()
@@ -242,7 +266,6 @@ const levels = computed(() => {
   return result
 })
 
-// ---- SVG connector lines ----
 const nodeRefs = {}
 const setNodeRef = (name, el) => {
   if (el) nodeRefs[name] = el
@@ -275,7 +298,6 @@ const calcConnectors = () => {
     const fromRect = fromEl.getBoundingClientRect()
     const toRect = toEl.getBoundingClientRect()
 
-    // From bottom-center of source → top-center of target
     const x1 = fromRect.left + fromRect.width / 2 - wrapperRect.left
     const y1 = fromRect.bottom - wrapperRect.top
     const x2 = toRect.left + toRect.width / 2 - wrapperRect.left
@@ -299,10 +321,8 @@ const scheduleCalc = () => {
 onMounted(scheduleCalc)
 onUpdated(scheduleCalc)
 
-// Recalculate when data changes
 watch(() => [props.graph, props.services], scheduleCalc, { deep: true })
 
-// Recalculate on resize
 let _resizeObserver = null
 onMounted(() => {
   nextTick(() => {
@@ -314,13 +334,118 @@ onMounted(() => {
   })
 })
 
+// ---- Force graph (ECharts) ----
+const chartRef = ref(null)
+let chartInstance = null
+
+const statusColor = (state) => {
+  if (state === 'running') return '#22c55e'
+  if (state === 'abnormal') return '#facc15'
+  return '#94a3b8'
+}
+
+const buildForceOption = () => {
+  const nodes = (props.graph?.nodes || []).map(n => {
+    const svc = getServiceData(n.id)
+    const state = props.getHealthState(svc)
+    return {
+      id: n.id,
+      name: n.id,
+      value: svc.pid ? `PID ${svc.pid}` : 'PID —',
+      symbolSize: 80,
+      itemStyle: { color: statusColor(state), borderColor: props.dark ? '#0f172a' : '#f8fafc', borderWidth: 2 },
+      label: {
+        show: true,
+        formatter: `{name|${n.id}}\n{meta|${props.getServiceHealthLabel(svc)}}`,
+        rich: {
+          name: { fontSize: 11, fontWeight: 600, color: props.dark ? '#e2e8f0' : '#1f2937', align: 'center', width: 120 },
+          meta: { fontSize: 10, color: props.dark ? '#cbd5f5' : '#64748b', align: 'center', width: 120 },
+        }
+      }
+    }
+  })
+
+  const edges = (props.graph?.edges || []).map(e => ({ source: e.from, target: e.to }))
+
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      formatter: (params) => {
+        if (params.dataType === 'edge') return `${params.data.source} → ${params.data.target}`
+        const svc = getServiceData(params.data.id)
+        const deps = getNodeDeps(params.data.id).join(', ') || '—'
+        return `<div style="font-size:12px;">${params.data.id}<br/>${props.getServiceHealthLabel(svc)}<br/>Deps: ${deps}</div>`
+      }
+    },
+    series: [
+      {
+        type: 'graph',
+        layout: 'force',
+        data: nodes,
+        links: edges,
+        roam: true,
+        label: { position: 'inside' },
+        edgeSymbol: ['none', 'arrow'],
+        edgeSymbolSize: 6,
+        lineStyle: { color: props.dark ? '#475569' : '#94a3b8', width: 1.2, opacity: 0.8 },
+        force: { repulsion: 220, edgeLength: 120, gravity: 0.1 },
+      }
+    ]
+  }
+}
+
+const ensureChart = () => {
+  if (!chartRef.value || viewMode.value !== 'force') return
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+  }
+  chartInstance.setOption(buildForceOption(), true)
+}
+
+const resizeChart = () => {
+  if (chartInstance) chartInstance.resize()
+}
+
+watch(viewMode, () => {
+  if (viewMode.value === 'force') {
+    nextTick(() => {
+      ensureChart()
+      resizeChart()
+    })
+  }
+})
+
+watch(() => [props.graph, props.services, props.dark], () => {
+  if (viewMode.value === 'force') {
+    nextTick(() => ensureChart())
+  }
+}, { deep: true })
+
+onMounted(() => {
+  if (viewMode.value === 'force') {
+    nextTick(() => ensureChart())
+  }
+  window.addEventListener('resize', resizeChart)
+})
+
 onBeforeUnmount(() => {
   if (_resizeObserver) _resizeObserver.disconnect()
+  window.removeEventListener('resize', resizeChart)
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 </script>
 
 <style scoped>
 .workflow-card {
   position: relative;
+}
+
+.workflow-force-chart {
+  width: 100%;
+  min-height: 520px;
+  height: 60vh;
 }
 </style>

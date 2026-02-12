@@ -677,6 +677,8 @@
             :metrics-label="t('metrics')"
             :logs-label="t('logs')"
             :uptime-label="t('uptime') || 'Uptime'"
+            :topo-label="t('workflow_topo')"
+            :force-label="t('workflow_force')"
             :get-health-state="getHealthState"
             :get-service-health-label="getServiceHealthLabel"
             :get-service-health-text-class="getServiceHealthTextClass"
@@ -2564,6 +2566,8 @@ const translations = {
   workflow_loading: '正在加载工作流...',
   workflow_refresh: '刷新',
   workflow_load_failed: '工作流加载失败',
+  workflow_topo: '拓扑布局',
+  workflow_force: '力导向图',
     history: '历史',
     range_1h: '近 1 小时',
     range_6h: '近 6 小时',
@@ -2877,6 +2881,8 @@ const translations = {
   workflow_loading: 'Loading workflow...',
   workflow_refresh: 'Refresh',
   workflow_load_failed: 'Failed to load workflow',
+  workflow_topo: 'Topology',
+  workflow_force: 'Force Graph',
     history: 'History',
     range_1h: 'Last 1h',
     range_6h: 'Last 6h',
