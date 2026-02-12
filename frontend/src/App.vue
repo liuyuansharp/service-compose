@@ -2479,7 +2479,8 @@ const onLogsScroll = () => {
     const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30
     followLogs.value = atBottom
   } else {
-    // History 模式无限滚动
+    // History 模式无限滚动 —— 必须在空闲时才触发，防止与 goToTop/goToBottom/fetchMoreLogs 冲突
+    if (logsLoading.value[svc]) return
     if (container.scrollTop === 0 && logHasMorePrev.value[svc]) {
       fetchMoreLogs('prev')
     } else if (container.scrollTop + container.clientHeight >= container.scrollHeight - 2 && logHasMoreNext.value[svc]) {
@@ -5447,6 +5448,7 @@ const toRangeQuery = () => {
 const fetchMoreLogs = async (direction = 'prev') => {
   const service = selectedService.value
   if (!service) return
+  if (logsLoading.value[service]) return  // 防止并发重复请求
   logsLoading.value[service] = true
   const currentLogs = logs.value[service] || []
   const offset = logOffset.value[service] || 0
