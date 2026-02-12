@@ -8,17 +8,15 @@ from typing import Dict, List
 from collections import deque
 
 # ---------- Paths ----------
-SERVICE_DIR = Path(__file__).resolve().parent.parent          # project root
-CONFIG_FILE = SERVICE_DIR / 'examples' / 'services_config_example.json'
-LOGS_DIR = SERVICE_DIR / 'logs'
-AUTH_DB_PATH = SERVICE_DIR / 'auth.db'
+RUN_DIR = Path(__file__).resolve().parent.parent          # project root
+CONFIG_FILE = RUN_DIR / 'services_config.json'
+LOGS_DIR = RUN_DIR / 'logs'
+AUTH_DB_PATH = RUN_DIR / 'auth.db'
 AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
 SYSTEM_METRICS_FILE = LOGS_DIR / 'system_metrics_history.json'
 
-LOGS_DIR.mkdir(exist_ok=True)
-
 # ---------- Auth ----------
-SECRET_KEY = os.getenv('AUTH_SECRET_KEY', 'change-this-secret')
+SECRET_KEY = os.getenv('AUTH_SECRET_KEY', 'liuyuan_wsd')
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '480'))
 
@@ -55,8 +53,27 @@ UPDATE_TASKS: Dict[str, Dict] = {}
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('backend')
 
-
 # ---------- Config ----------
+def update_run_dir(services_conifg_path):
+    services_conifg = {}
+    try:
+        with open(services_conifg_path, 'r') as f:
+            services_conifg = json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+
+    if services_conifg:
+        run_dir = services_conifg.get("run_dir",None)
+        if run_dir:
+            global RUN_DIR, CONFIG_FILE, LOGS_DIR, AUTH_DB_PATH, AUDIT_LOG_FILE, SYSTEM_METRICS_FILE
+            RUN_DIR = Path(run_dir)
+            CONFIG_FILE = Path(services_conifg_path)
+            LOGS_DIR = RUN_DIR / 'logs'
+            AUTH_DB_PATH = RUN_DIR / 'auth.db'
+            AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
+            SYSTEM_METRICS_FILE = LOGS_DIR / 'system_metrics_history.json'
+            LOGS_DIR.mkdir(exist_ok=True)
+            logger.info(f"Updated run directory to: {RUN_DIR}")
 
 def load_config() -> dict:
     """Load services configuration (unified format — only 'services' key)."""

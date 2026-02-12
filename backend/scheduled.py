@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
-from .config import SERVICE_DIR, load_config, save_config, logger
+from .config import RUN_DIR, CONFIG_FILE, load_config, save_config, logger
 from .audit import append_audit_log
 
 
@@ -69,10 +69,10 @@ def _should_restart_now(sr: Dict, now: datetime) -> bool:
 
 
 def _do_scheduled_restart(service_name: str):
-    cmd = [sys.executable, str(SERVICE_DIR / 'manage_services.py'), 'restart',
+    cmd = [sys.executable, str(RUN_DIR / 'manage_services.py'), 'restart', "--config", f"{CONFIG_FILE}"
            '--service', service_name, '--daemon']
     try:
-        subprocess.Popen(cmd, cwd=str(SERVICE_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.Popen(cmd, cwd=str(RUN_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         append_audit_log(user="system", role="system", action="restart", target=service_name, detail="scheduled restart")
     except Exception as e:
         logger.error(f"Scheduled restart failed for {service_name}: {e}")

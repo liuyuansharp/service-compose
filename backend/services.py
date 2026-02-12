@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 import psutil
 
 from .config import (
-    LOGS_DIR, SERVICE_DIR, logger,
+    LOGS_DIR, RUN_DIR, logger,
     load_config, get_all_services,
     METRICS_HISTORY, METRICS_LAST_IO_READ, METRICS_LAST_IO_WRITE,
     MAX_METRICS_POINTS, METRICS_INTERVAL_SECONDS,
@@ -253,7 +253,7 @@ def _get_process_tree_metrics(pid: int) -> Dict:
 
 def get_service_info(service_name: str) -> ServiceInfo:
     from .update import read_manifest
-    manifest = read_manifest(SERVICE_DIR / "deployments" / service_name)
+    manifest = read_manifest(RUN_DIR / "deployments" / service_name)
     uptime = None
     uptime_seconds = None
     try:

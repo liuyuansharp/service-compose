@@ -7,16 +7,27 @@ import json
 import sys
 import uuid
 
+from . import config as _config
+
+if "--config" in sys.argv:
+    try:
+        config_index = sys.argv.index("--config")
+        if config_index + 1 < len(sys.argv):
+            _config.update_run_dir(sys.argv[config_index + 1])
+            logger.info(f"Using services config: {sys.argv[config_index + 1]}")
+    except Exception:
+        pass
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Depends, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import (
-    SERVICE_DIR, LOGS_DIR, logger,
+    RUN_DIR, LOGS_DIR, logger,
     load_config, save_config, get_all_services,
     METRICS_HISTORY, MAX_METRICS_HISTORY_POINTS,
-    UPDATE_TASKS,
+    UPDATE_TASKS, update_run_dir, CONFIG_FILE
 )
 from .auth import (
     init_auth_db, authenticate_user, create_access_token, decode_token,
@@ -407,8 +418,10 @@ async def _get_service_lock(service_name: str) -> asyncio.Lock:
 async def _run_service_command(action: str, service: Optional[str], timeout: float = 30) -> dict:
     cmd = [
         sys.executable,
-        str(SERVICE_DIR / 'manage_services.py'),
-        action
+        str(RUN_DIR / 'manage_services.py'),
+        action,
+        f"--config",
+        f"{CONFIG_FILE}"
     ]
     if service:
         cmd.extend(['--service', service])
@@ -423,7 +436,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
     if is_daemon:
         await asyncio.create_subprocess_exec(
             *cmd,
-            cwd=str(SERVICE_DIR),
+            cwd=str(RUN_DIR),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -440,7 +453,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=str(SERVICE_DIR),
+        cwd=str(RUN_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -968,7 +981,7 @@ async def upload_update_package(
     require_operator(current_user)
     if not file.filename or not file.filename.endswith(".tar.gz"):
         raise HTTPException(status_code=400, detail="Only .tar.gz packages are supported")
-    upload_dir = SERVICE_DIR / "uploads"
+    upload_dir = RUN_DIR / "uploads"
     upload_dir.mkdir(exist_ok=True)
     task_id = uuid.uuid4().hex
     file_path = upload_dir / f"{service}-{task_id}.tar.gz"
@@ -1170,7 +1183,7 @@ async def websocket_terminal(websocket: WebSocket, token: Optional[str] = Query(
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             env["LANG"] = os.environ.get("LANG", "en_US.UTF-8")
-            os.chdir(str(SERVICE_DIR))
+            os.chdir(str(RUN_DIR))
             os.execvpe(shell, [shell, "--login"], env)
             # never returns
 
@@ -1278,7 +1291,7 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
-frontend_dist = SERVICE_DIR / 'frontend' / 'dist'
+frontend_dist = RUN_DIR / 'frontend' / 'dist'
 if frontend_dist.exists():
     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
@@ -1291,11 +1304,12 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+    parser.add_argument("--config", type=str, default="", help="Services Config")
     args = parser.parse_args()
 
     logger.info(f"Starting Service Manager Dashboard API on {args.host}:{args.port}")
     logger.info(f"API documentation: http://{args.host}:{args.port}/api/docs")
-
+          
     uvicorn.run(
         app,
         host=args.host,

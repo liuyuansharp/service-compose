@@ -12,13 +12,11 @@ import threading
 import time
 from pathlib import Path
 from datetime import datetime
-
-from backend.config import topological_sort
+from typing import Dict, List
 
 ROOT = Path(__file__).resolve().parent
-CONFIG_PATH = ROOT / 'services_config.json'
+CONFIG_FILE = ROOT / 'services_config.json'
 LOGS_DIR = ROOT / 'logs'
-
 
 def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=3):
     """Setup rotating file handler for each service.
@@ -55,6 +53,57 @@ def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=3):
     
     return logger
 
+
+def build_dependency_graph(services: List[dict] = []) -> Dict[str, List[str]]:
+    """Build adjacency list: service → [services it depends on].
+    
+    Returns dict like {'service_A': ['platform'], 'platform': [], ...}
+    """
+    graph = {}
+    for svc in services:
+        name = svc.get('name', '')
+        graph[name] = svc.get('depends_on', [])
+    return graph
+
+
+def topological_sort(services: List[dict] = []) -> List[List[str]]:
+    """Return a list of *levels* for parallel startup.
+    
+    Each level is a list of service names that can start in parallel.
+    Level 0 has no dependencies, Level 1 depends only on Level 0 services, etc.
+    
+    Raises ValueError on cyclic dependencies.
+    """
+    graph = build_dependency_graph(services)
+    all_names = set(graph.keys())
+    in_degree = {name: 0 for name in all_names}
+    # reverse adjacency (who depends on me)
+    dependents: Dict[str, List[str]] = {name: [] for name in all_names}
+    for name, deps in graph.items():
+        for dep in deps:
+            if dep in all_names:
+                in_degree[name] += 1
+                dependents[dep].append(name)
+
+    levels: List[List[str]] = []
+    ready = [n for n in all_names if in_degree[n] == 0]
+    visited = 0
+
+    while ready:
+        levels.append(sorted(ready))  # sort for determinism
+        next_ready = []
+        for n in ready:
+            visited += 1
+            for dep in dependents[n]:
+                in_degree[dep] -= 1
+                if in_degree[dep] == 0:
+                    next_ready.append(dep)
+        ready = next_ready
+
+    if visited != len(all_names):
+        raise ValueError(f"Cyclic dependency detected among services: "
+                         f"{[n for n in all_names if in_degree[n] > 0]}")
+    return levels
 
 class ServiceProcess:
     """Manages a single service process with auto-restart, logging, and pid tracking."""
@@ -258,9 +307,10 @@ class ServiceProcess:
 class Manager:
     """Manages services (unified, no platform distinction)."""
     
-    def __init__(self, config_path=CONFIG_PATH):
+    def __init__(self, config_path=CONFIG_FILE):
         self.config_path = Path(config_path)
-        self.logger = setup_logger('Manager', str(LOGS_DIR / 'manager.log'))
+        self.run_dir = None
+        self.logger = None
         self._load_config()
         self.services = []
         self.services_map = {}
@@ -268,9 +318,16 @@ class Manager:
     def _load_config(self):
         """Load configuration from JSON file."""
         try:
+            global CONFIG_FILE
+            CONFIG_FILE = self.config_path
             with open(self.config_path) as f:
                 cfg = json.load(f)
-            self.services_cfg = cfg.get('services', [])
+                self.services_cfg = cfg.get('services', [])
+                self.run_dir = cfg.get('run_dir', None)
+            if self.run_dir:
+                global LOGS_DIR
+                LOGS_DIR = Path(self.run_dir) / "logs"
+            self.logger = setup_logger('Manager', str(LOGS_DIR / 'manager.log'))
             self.logger.info(f"Loaded config from {self.config_path}")
         except Exception as e:
             self.logger.error(f"Failed to load config: {e}")
@@ -296,7 +353,7 @@ class Manager:
     def _get_start_levels(self):
         """Return ordered start levels based on dependency graph."""
         try:
-            return topological_sort({"services": self.services_cfg})
+            return topological_sort(self.services_cfg)
         except Exception as e:
             self.logger.error(f"Dependency graph error: {e}")
             # Fallback: all services in one level
@@ -482,11 +539,11 @@ def main():
     )
     parser.add_argument(
         '--config',
-        default=str(CONFIG_PATH),
-        help=f'Config file path (default: {CONFIG_PATH})'
+        default=str(CONFIG_FILE),
+        help=f'Config file path (default: {CONFIG_FILE})'
     )
     args = parser.parse_args()
-
+    
     try:
         mgr = Manager(args.config)
         mgr.setup()
