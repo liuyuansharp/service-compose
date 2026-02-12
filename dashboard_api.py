@@ -2292,9 +2292,20 @@ async def get_logs(
     offset: int = Query(0),
     search: Optional[str] = Query(None),
     level: Optional[str] = Query(None),
+    range: Optional[str] = Query(None, alias="range"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict:
-    """Get log entries for a service. Reads across rotated log files (.log.N → .log)."""
+    """Get log entries for a service. Reads across rotated log files (.log.N → .log).
+    
+    range: optional time range filter — '1h','6h','24h','7d','30d','all' or None.
+    When set (and not 'all'), only log lines whose timestamp falls within the
+    last N seconds are included.
+    """
+    # Precompute time-range cutoff (if any)
+    _range_seconds = {"1h": 3600, "6h": 6*3600, "24h": 24*3600, "7d": 7*24*3600, "30d": 30*24*3600}
+    time_cutoff = None
+    if range and range != "all" and range in _range_seconds:
+        time_cutoff = datetime.now() - timedelta(seconds=_range_seconds[range])
     try:
         log_file = LOGS_DIR / f"{service}.log"
         chain = _get_log_chain(service)
@@ -2311,8 +2322,8 @@ async def get_logs(
         
         # Read log files (chained: all backups + current)
         total_lines = 0
-        # 读取所有日志（全量/搜索）
-        if search or level:
+        # 读取所有日志（全量/搜索/分级/时间范围过滤时需全量扫描）
+        if search or level or time_cutoff:
             # For search or level, read from ALL chained files (capped to MAX_LOG_SEARCH_LINES if >0)
             if MAX_LOG_SEARCH_LINES is not None and MAX_LOG_SEARCH_LINES > 0:
                 recent_logs = deque(maxlen=MAX_LOG_SEARCH_LINES)
@@ -2354,6 +2365,17 @@ async def get_logs(
                 (idx, line) for idx, line in indexed_logs
                 if extract_log_level(line) == level_upper
             ]
+
+        # 按时间范围过滤（如有）
+        if time_cutoff:
+            def _line_in_range(line: str) -> bool:
+                ts_str = line[:19]  # e.g. "2026-02-12 10:23:45"
+                try:
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                    return ts >= time_cutoff
+                except Exception:
+                    return True  # 无法解析时间戳的行保留
+            indexed_logs = [(idx, line) for idx, line in indexed_logs if _line_in_range(line)]
 
         # 再按搜索过滤
         if search:
@@ -2398,11 +2420,11 @@ async def get_logs(
         entries = []
         for idx, log_line in logs_to_return:
             if log_line.strip():
-                level = extract_log_level(log_line)
+                entry_level = extract_log_level(log_line)
                 line_number = idx + 1
                 entries.append({
                     "raw": log_line.rstrip(),
-                    "level": level,
+                    "level": entry_level,
                     "timestamp": log_line[:19] if len(log_line) > 19 else "",
                     "line": line_number,
                 })
@@ -2572,15 +2594,33 @@ async def download_logs(service: str = Query("platform"), current_user: dict = D
 @app.get("/api/logs/level-counts")
 async def get_log_level_counts(
     service: str = Query("platform"),
+    range: Optional[str] = Query(None, alias="range"),
     current_user: dict = Depends(get_current_user)
 ) -> Dict:
-    """Return log level counts for all chained log files of a service."""
+    """Return log level counts for all chained log files of a service.
+    
+    range: optional time range filter — '1h','6h','24h','7d','30d','all' or None.
+    """
+    _range_seconds = {"1h": 3600, "6h": 6*3600, "24h": 24*3600, "7d": 7*24*3600, "30d": 30*24*3600}
+    time_cutoff = None
+    if range and range != "all" and range in _range_seconds:
+        time_cutoff = datetime.now() - timedelta(seconds=_range_seconds[range])
+
     chain = _get_log_chain(service)
     counts = {"ERROR": 0, "WARNING": 0, "INFO": 0, "DEBUG": 0}
     for fpath in chain:
         try:
             with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
                 for line in f:
+                    # 时间范围过滤
+                    if time_cutoff:
+                        ts_str = line[:19]
+                        try:
+                            ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                            if ts < time_cutoff:
+                                continue
+                        except Exception:
+                            pass
                     lvl = extract_log_level(line)
                     if lvl in counts:
                         counts[lvl] += 1

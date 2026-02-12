@@ -1245,202 +1245,241 @@
     <div
       v-show="selectedService"
       class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
-      @click.self="selectedService = null"
+      @click.self="closeLogViewer"
     >
-  <div class="tech-card rounded-md w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col">
-        <!-- Modal Header -->
-        <div class="flex justify-between items-center px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 dark:border-slate-800">
-          <div class="flex items-center gap-3">
-            <div class="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-              <svg viewBox="0 0 24 24" class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <div class="tech-card rounded-lg w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+        <!-- ═══ Header: 服务名 + 模式切换 + 关闭 ═══ -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              :class="logMode === 'live' ? 'bg-emerald-100 dark:bg-emerald-500/20' : 'bg-slate-100 dark:bg-slate-700/40'">
+              <svg v-if="logMode === 'live'" viewBox="0 0 24 24" class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" class="h-4 w-4 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
-            <div>
-              <h3 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-slate-100">{{ t('logs') }} - {{ selectedService }}</h3>
-              <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('log_viewer_desc') }}</p>
+            <div class="min-w-0">
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-slate-100 truncate">{{ selectedService }}</h3>
+              <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ logMode === 'live' ? t('log_mode_live_desc') : t('log_mode_history_desc') }}</p>
             </div>
           </div>
-          <button
-            @click="selectedService = null"
-            class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 transition"
-          >
-            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
-          </button>
-        </div>
-
-        <!-- Toolbar Row 1: Navigation + Stream Control + Actions -->
-        <div class="flex items-center gap-1.5 px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
-          <!-- Left: Navigation group -->
-          <div class="flex items-center gap-1 mr-1">
-            <button
-              @click="() => { rememberCurrentPosition(); goToTop() }"
-              class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              :title="t('top')"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/><line x1="6" y1="5" x2="18" y2="5"/></svg>
-            </button>
-            <button
-              @click="() => { rememberCurrentPosition(); goToBottom() }"
-              class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              :title="t('bottom')"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/><line x1="6" y1="19" x2="18" y2="19"/></svg>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Mode toggle -->
+            <div class="flex bg-gray-200/80 dark:bg-gray-800/80 rounded-md p-0.5">
+              <button
+                @click.prevent="setLogMode('live')"
+                class="px-2.5 py-1 rounded text-[11px] font-semibold transition-all inline-flex items-center gap-1"
+                :class="logMode === 'live'
+                  ? 'bg-emerald-500 text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+              >
+                <span class="relative flex h-1.5 w-1.5" v-if="logMode === 'live'">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                </span>
+                {{ t('log_mode_live') }}
+              </button>
+              <button
+                @click.prevent="setLogMode('history')"
+                class="px-2.5 py-1 rounded text-[11px] font-semibold transition-all inline-flex items-center gap-1"
+                :class="logMode === 'history'
+                  ? 'bg-slate-700 text-white shadow-sm dark:bg-slate-500'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+              >
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ t('log_mode_history') }}
+              </button>
+            </div>
+            <button @click="closeLogViewer" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 transition">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
             </button>
           </div>
-
-          <!-- Stream control (only in live mode) -->
-          <button
-            v-if="logMode === 'live'"
-            @click="togglePause"
-            class="px-2 py-1 rounded text-[11px] font-medium transition inline-flex items-center gap-1"
-            :class="logPaused ? 'bg-green-600/90 text-white hover:bg-green-700' : 'bg-blue-600/90 text-white hover:bg-blue-700'"
-          >
-            <svg v-if="logPaused" viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
-            <svg v-else viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-            {{ logPaused ? t('resume') : t('pause') }}
-          </button>
-
-          <!-- Spacer -->
-          <div class="flex-1"></div>
-
-          <!-- Right: Action buttons -->
-          <button
-            @click="downloadLogs"
-            class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition"
-            :title="t('download')"
-          >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </button>
-          <button
-            @click="clearLogs"
-            class="p-1.5 rounded bg-gray-200/70 dark:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition"
-            :title="t('clear')"
-          >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
         </div>
 
-        <!-- Toolbar Row 2: Level Filter + Search -->
-        <div class="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2 border-b border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950/50">
+        <!-- ═══ Toolbar: 级别 + 搜索 + 操作按钮（单行紧凑布局） ═══ -->
+        <div class="flex items-center gap-2 px-3 py-1.5 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
           <!-- Log Level Filter Pills -->
           <div class="flex items-center gap-0.5 bg-gray-200/60 dark:bg-gray-800/60 rounded-md p-0.5 flex-shrink-0">
             <button
               v-for="lvl in logLevelFilters"
               :key="lvl.value"
               @click="onLogLevelClick(lvl.value)"
-              class="px-2 py-1 rounded text-[10px] font-semibold transition leading-none"
+              class="px-1.5 py-1 rounded text-[10px] font-semibold transition leading-none"
               :class="logLevelFilter === lvl.value
                 ? lvl.activeClass
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
             >
-              {{ lvl.label }}
-              <span v-if="lvl.value !== 'ALL'" class="ml-0.5 opacity-70">{{ getLogLevelCount(lvl.value) }}</span>
+              {{ typeof lvl.label === 'object' ? lvl.label.value : lvl.label }}
+              <span v-if="lvl.value !== 'ALL'" class="ml-0.5 opacity-70 tabular-nums">{{ getLogLevelCount(lvl.value) }}</span>
             </button>
           </div>
 
-          <!-- Log mode toggle -->
-          <div class="flex items-center gap-1 ml-3 flex-shrink-0">
-            <button
-              @click.prevent="setLogMode('live')"
-              :class="['px-2 py-1 rounded text-[10px] font-semibold transition', logMode === 'live' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700']"
-            >{{ t('log_mode_live') }}</button>
-            <button
-              @click.prevent="setLogMode('history')"
-              :class="['px-2 py-1 rounded text-[10px] font-semibold transition', logMode === 'history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700']"
-            >{{ t('log_mode_history') }}</button>
-          </div>
-
-          <!-- Search bar -->
+          <!-- Search -->
           <div class="flex-1 min-w-0 flex gap-1 items-center">
             <div class="relative flex-1 min-w-0">
-              <svg viewBox="0 0 24 24" class="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <svg viewBox="0 0 24 24" class="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input
                 v-model="logSearch"
                 type="text"
                 :placeholder="`${t('search_logs')}...`"
-                class="w-full pl-7 pr-2 py-1.5 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                class="w-full pl-7 pr-7 py-1 border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
+              <button
+                v-if="logSearch"
+                @click="logSearch = ''"
+                class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                :title="t('clear')"
+              >
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+              </button>
             </div>
+            <!-- Match navigation (shown when there are matches) -->
+            <template v-if="logSearch && searchMatches[selectedService]?.length">
+              <span class="text-[10px] text-gray-400 tabular-nums whitespace-nowrap">{{ (currentMatchIndex[selectedService] ?? -1) + 1 }}/{{ searchMatches[selectedService].length }}</span>
+              <button @click="jumpToPrevMatch" class="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" :title="t('prev')">
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <button @click="jumpToNextMatch" class="p-0.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" :title="t('next')">
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </template>
+          </div>
+
+          <!-- Divider -->
+          <div class="w-px h-5 bg-gray-300 dark:bg-gray-700 flex-shrink-0"></div>
+
+          <!-- Action buttons group -->
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <!-- Live mode: Pause / Resume -->
             <button
-              @click="jumpToPrevMatch"
-              class="p-1 bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs transition"
-              :title="t('prev')"
+              v-if="logMode === 'live'"
+              @click="togglePause"
+              class="px-2 py-1 rounded text-[10px] font-semibold transition inline-flex items-center gap-1"
+              :class="logPaused
+                ? 'bg-emerald-500/90 text-white hover:bg-emerald-600'
+                : 'bg-amber-500/90 text-white hover:bg-amber-600'"
+              :title="logPaused ? t('resume') : t('pause')"
             >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              <svg v-if="logPaused" viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
+              <svg v-else viewBox="0 0 24 24" class="h-3 w-3" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              {{ logPaused ? t('resume') : t('pause') }}
             </button>
+            <!-- Top -->
             <button
-              @click="jumpToNextMatch"
-              class="p-1 bg-gray-200/70 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-xs transition"
-              :title="t('next')"
+              @click="() => { rememberCurrentPosition(); goToTop() }"
+              class="p-1 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+              :title="t('top')"
             >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/><line x1="6" y1="5" x2="18" y2="5"/></svg>
+            </button>
+            <!-- Bottom -->
+            <button
+              @click="() => { rememberCurrentPosition(); goToBottom() }"
+              class="p-1 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+              :title="t('bottom')"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/><line x1="6" y1="19" x2="18" y2="19"/></svg>
+            </button>
+            <!-- Download -->
+            <button
+              @click="downloadLogs"
+              class="p-1 rounded text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition"
+              :title="t('download')"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <!-- Clear (live only) -->
+            <button
+              v-if="logMode === 'live'"
+              @click="clearLogs"
+              class="p-1 rounded text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+              :title="t('clear')"
+            >
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
           </div>
         </div>
 
-        <!-- Modal Body - Logs Display -->
+        <!-- ═══ Body: 日志内容 ═══ -->
         <div
           ref="logsContainer"
-          class="flex-1 overflow-y-auto p-3 sm:p-4 bg-black font-mono text-xs sm:text-sm"
-          style="max-height: calc(92vh - 320px)"
+          class="flex-1 overflow-y-auto bg-[#0d1117] font-mono text-xs leading-5"
+          style="min-height: 200px"
+          @scroll="onLogsScroll"
         >
-          <div v-if="logsLoading[selectedService]" class="text-gray-400 text-center py-8 flex items-center justify-center gap-2">
-            <svg class="animate-spin h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"/></svg>
-            {{ t('loading_logs') }}...
+          <!-- Loading -->
+          <div v-if="logsLoading[selectedService]" class="text-gray-400 text-center py-12 flex flex-col items-center gap-2">
+            <svg class="animate-spin h-5 w-5 text-blue-400" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="opacity-75"/></svg>
+            <span>{{ t('loading_logs') }}...</span>
           </div>
-          <div v-else-if="filteredDisplayedLogs.length === 0" class="text-gray-500 text-center py-8">
+          <!-- Empty state -->
+          <div v-else-if="filteredDisplayedLogs.length === 0" class="text-gray-500 text-center py-12">
+            <svg viewBox="0 0 24 24" class="h-8 w-8 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
             <p>{{ t('no_logs_available') }}</p>
             <p v-if="logLevelFilter !== 'ALL'" class="text-xs mt-1 text-gray-600">{{ t('log_filter_no_match') }}</p>
           </div>
-          <div
-            v-for="(log, idx) in filteredDisplayedLogs"
-            :key="log._fIdx"
-            class="mb-0.5 whitespace-pre-wrap break-words flex group"
-            :class="getLogColor(log.level)"
-          >
-            <span
-              class="text-gray-600 mr-1 select-none w-12 sm:w-16 text-right pr-1.5 border-r border-gray-800 cursor-pointer hover:text-white hover:bg-gray-800/60 text-[10px] sm:text-xs flex-shrink-0 leading-5"
-              :class="{
-                'bg-yellow-700/80 text-white': logSearch &&
-                  searchMatches[selectedService] &&
-                  currentMatchIndex[selectedService] != null &&
-                  currentMatchIndex[selectedService] >= 0 &&
-                  searchMatches[selectedService][currentMatchIndex[selectedService]] === ((log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1)) - 1)
-              }"
-              @click="jumpToLogLine((log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1)) - 1)"
+          <!-- Log lines -->
+          <div v-else class="px-2 py-1">
+            <div
+              v-for="(log, idx) in filteredDisplayedLogs"
+              :key="log._fIdx"
+              class="flex hover:bg-white/5 rounded-sm transition-colors"
+              :class="[
+                getLogColor(log.level),
+                isCurrentMatchLine(log, idx) ? 'bg-yellow-500/15 ring-1 ring-yellow-500/40' : ''
+              ]"
             >
-              {{ log.line || ((logsMeta[selectedService]?.offset || 0) + log._origIdx + 1) }}
-            </span>
-            <!-- Log level badge -->
-            <span
-              class="mx-1 text-[9px] font-bold w-7 text-center flex-shrink-0 leading-5 rounded-sm"
-              :class="{
-                'text-red-400 bg-red-500/10': log.level === 'ERROR',
-                'text-yellow-400 bg-yellow-500/10': log.level === 'WARNING',
-                'text-green-500 bg-green-500/5': log.level === 'INFO',
-                'text-blue-400 bg-blue-500/10': log.level === 'DEBUG',
-                'text-gray-500': !['ERROR','WARNING','INFO','DEBUG'].includes(log.level)
-              }"
-            >{{ log.level?.charAt(0) || '—' }}</span>
-            <span class="pl-1 flex-1 leading-5">{{ log.raw }}</span>
+              <!-- Line number -->
+              <span
+                class="text-gray-600 select-none w-12 sm:w-14 text-right pr-2 border-r border-gray-800/60 text-[10px] flex-shrink-0 leading-5 cursor-pointer hover:text-blue-400 transition-colors tabular-nums"
+                @click="onLineNumberClick(log)"
+              >{{ getLogLineNumber(log) }}</span>
+              <!-- Level badge -->
+              <span
+                class="mx-1 text-[9px] font-bold w-6 text-center flex-shrink-0 leading-5 rounded-sm"
+                :class="{
+                  'text-red-400 bg-red-500/10': log.level === 'ERROR',
+                  'text-yellow-400 bg-yellow-500/10': log.level === 'WARNING',
+                  'text-green-500 bg-green-500/5': log.level === 'INFO',
+                  'text-blue-400 bg-blue-500/10': log.level === 'DEBUG',
+                  'text-gray-500': !['ERROR','WARNING','INFO','DEBUG'].includes(log.level)
+                }"
+              >{{ log.level?.charAt(0) || '—' }}</span>
+              <!-- Log content -->
+              <span class="pl-1 flex-1 leading-5 whitespace-pre-wrap break-all" v-html="highlightLogText(log.raw)"></span>
+            </div>
           </div>
         </div>
 
-        <!-- Modal Footer -->
-  <div class="px-3 sm:px-4 py-2 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-[10px] sm:text-xs text-gray-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span>{{ t('showing_logs', { count: filteredDisplayedLogs.length }) }}</span>
-          <span v-if="logLevelFilter !== 'ALL'" class="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">
-            {{ t('log_level_filter') }}: {{ logLevelFilter }}
-          </span>
-          <span v-if="logSearch">
-            {{ t('filtered_by') }}: "{{ logSearch }}"
-            <span v-if="searchMatches[selectedService] && searchMatches[selectedService].length">
-              · {{ t('match') }} {{ (currentMatchIndex[selectedService] ?? -1) + 1 }}/{{ searchMatches[selectedService].length }}
+        <!-- ═══ Footer: 状态栏 ═══ -->
+        <div class="px-3 py-1.5 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+          <!-- Live indicator -->
+          <span v-if="logMode === 'live'" class="inline-flex items-center gap-1">
+            <span class="relative flex h-1.5 w-1.5">
+              <span v-if="!logPaused" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-1.5 w-1.5" :class="logPaused ? 'bg-amber-400' : 'bg-emerald-400'"></span>
             </span>
+            <span :class="logPaused ? 'text-amber-500' : 'text-emerald-500'" class="font-medium">{{ logPaused ? t('paused') : t('streaming') }}</span>
           </span>
-          <span v-if="selectedService && logsMeta[selectedService] && logMode === 'history'">
+          <!-- Counts -->
+          <span class="tabular-nums">{{ t('showing_logs', { count: filteredDisplayedLogs.length }) }}</span>
+          <span v-if="logLevelFilter !== 'ALL'" class="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">
+            {{ logLevelFilter }}
+          </span>
+          <span v-if="logSearch && searchMatches[selectedService]?.length" class="text-yellow-500">
+            {{ t('match') }}: {{ searchMatches[selectedService].length }}
+          </span>
+          <!-- Spacer -->
+          <span class="flex-1"></span>
+          <!-- History: total lines from backend -->
+          <span v-if="logMode === 'history' && selectedService && logsMeta[selectedService]" class="tabular-nums">
             {{ t('total_lines', { count: logsMeta[selectedService].total }) }}
+          </span>
+          <!-- Live: buffer size -->
+          <span v-if="logMode === 'live'" class="tabular-nums">
+            {{ t('buffer_size', { count: (logs[selectedService] || []).length, max: LIVE_LOG_LIMIT }) }}
           </span>
         </div>
       </div>
@@ -2361,30 +2400,91 @@ const buildWsUrl = (path) => {
   return `${wsProto}://${wsHost}:${wsPort}${path.startsWith('/') ? path : `/${path}`}`
 }
 
-// 点击分级按钮时自动发起分级搜索
-const onLogLevelClick = (level) => {
+// ═══ 日志级别点击 ═══
+// Live：纯前端过滤，不打断流
+// History：向后端请求该级别最近200条
+const onLogLevelClick = async (level) => {
   logLevelFilter.value = level
-  // 切换分级时，清空搜索内容
-  logSearch.value = ''
-  // ERROR/WARNING/DEBUG 触发后端分级过滤，暂停实时
-  if (["ERROR", "WARNING", "DEBUG"].includes(level)) {
-    if (!logPaused.value) {
-      logPaused.value = true
-      if (logSocket && logSocket.readyState === 1) {
-        logSocket.send(JSON.stringify({ action: 'pause' }))
-      }
+  searchMatches.value[selectedService.value] = []
+  currentMatchIndex.value[selectedService.value] = -1
+  if (logMode.value === 'live') {
+    // Live 模式仅前端过滤，computed 自动生效
+    return
+  }
+  // History 模式：向后端请求
+  if (level !== 'ALL') {
+    await fetchLogsByLevel(level)
+  } else {
+    await loadLogs(selectedService.value)
+  }
+}
+
+// ═══ 关闭日志查看器 ═══
+const closeLogViewer = () => {
+  selectedService.value = null
+}
+
+// ═══ 辅助：当前行是否为当前搜索匹配行 ═══
+const isCurrentMatchLine = (log, idx) => {
+  const svc = selectedService.value
+  if (!logSearch.value || !svc) return false
+  const matches = searchMatches.value[svc]
+  const matchIdx = currentMatchIndex.value[svc]
+  if (!matches?.length || matchIdx == null || matchIdx < 0) return false
+  if (logMode.value === 'live') {
+    // Live 模式：matches 存储的是 filteredDisplayedLogs 中的索引
+    return matches[matchIdx] === idx
+  }
+  // History 模式：matches 存储的是全局行号（0-based）
+  const lineNo = getLogLineNumber(log)
+  return matches[matchIdx] === (lineNo - 1)
+}
+
+// ═══ 获取日志行号 ═══
+const getLogLineNumber = (log) => {
+  const svc = selectedService.value
+  return log.line || ((logsMeta.value[svc]?.offset || 0) + (log._origIdx ?? 0) + 1)
+}
+
+// ═══ 行号点击 ═══
+const onLineNumberClick = (log) => {
+  if (logMode.value === 'live') return  // Live 模式行号无跳转意义
+  const lineNo = getLogLineNumber(log)
+  jumpToLogLine(lineNo - 1)
+}
+
+// ═══ 搜索高亮渲染 ═══
+const highlightLogText = (text) => {
+  if (!text) return ''
+  const raw = escapeHtml(text)
+  const kw = logSearch.value
+  if (!kw) return raw
+  try {
+    const re = new RegExp(escapeRegExp(kw), 'gi')
+    return raw.replace(re, (m) => `<mark class="bg-yellow-300/80 text-black rounded-sm px-0.5">${m}</mark>`)
+  } catch (e) {
+    return raw
+  }
+}
+
+// ═══ 滚动事件：Live 模式自动关闭跟随 + History 模式无限加载 ═══
+const onLogsScroll = () => {
+  const container = logsContainer.value
+  if (!container) return
+  const svc = selectedService.value
+  if (!svc) return
+
+  if (logMode.value === 'live') {
+    // 用户手动向上滚动 → 自动关闭跟随
+    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30
+    followLogs.value = atBottom
+  } else {
+    // History 模式无限滚动
+    if (container.scrollTop === 0 && logHasMorePrev.value[svc]) {
+      fetchMoreLogs('prev')
+    } else if (container.scrollTop + container.clientHeight >= container.scrollHeight - 2 && logHasMoreNext.value[svc]) {
+      fetchMoreLogs('next')
     }
-    // 主动拉取分级日志
-    fetchLogsByLevel(level)
-  } else if (level === "INFO" || level === "ALL") {
-    // INFO/ALL 恢复实时
-    if (logPaused.value) {
-      logPaused.value = false
-      if (logSocket && logSocket.readyState === 1) {
-        logSocket.send(JSON.stringify({ action: 'resume' }))
-      }
-    }
-    // logs.value[service] 不变，filteredDisplayedLogs 会自动只显示对应内容
   }
 }
 
@@ -2499,6 +2599,11 @@ const translations = {
     log_viewer_desc: '实时日志流与分级查看',
     log_mode_live: '实时',
     log_mode_history: '历史',
+    log_mode_live_desc: '实时日志流',
+    log_mode_history_desc: '历史日志查询',
+    paused: '已暂停',
+    streaming: '接收中',
+    buffer_size: '缓冲 {count}/{max}',
     log_level_filter: '级别筛选',
     log_filter_no_match: '当前级别无匹配日志，尝试切换筛选条件',
     log_level_all: '全部',
@@ -2799,6 +2904,11 @@ const translations = {
     log_viewer_desc: 'Real-time log streaming with level filtering',
     log_mode_live: 'Live',
     log_mode_history: 'History',
+    log_mode_live_desc: 'Real-time log streaming',
+    log_mode_history_desc: 'Historical log browsing',
+    paused: 'Paused',
+    streaming: 'Streaming',
+    buffer_size: 'Buffer {count}/{max}',
     log_level_filter: 'Level filter',
     log_filter_no_match: 'No logs match the current filter. Try switching levels.',
     log_level_all: 'All',
@@ -3691,18 +3801,6 @@ const escapeHtml = (str) => {
     .replace(/'/g, '&#039;')
 }
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const highlightText = (text) => {
-  if (!text) return ''
-  const raw = escapeHtml(text)
-  const kw = logSearch.value
-  if (!kw) return raw
-  try {
-    const re = new RegExp(escapeRegExp(kw), 'gi')
-    return raw.replace(re, (m) => `<mark class="bg-yellow-300 text-black dark:bg-yellow-500 dark:text-black">${m}</mark>`)
-  } catch (e) {
-    return raw
-  }
-}
 const logLevelFilters = [
   { value: 'ALL',     label: computed(() => t('log_level_all')),  activeClass: 'bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-sm' },
   { value: 'ERROR',   label: 'ERR',      activeClass: 'bg-red-500/90 text-white shadow-sm' },
@@ -3712,27 +3810,30 @@ const logLevelFilters = [
 ]
 // 日志模式: 'live' | 'history'
 const logMode = ref('live')
-const logModeLabel = computed(() => logMode.value === 'live' ? t('log_mode_live') : t('log_mode_history'))
 
+// ═══ setLogMode: 切换实时/历史 ═══
 const setLogMode = (mode) => {
   if (!['live', 'history'].includes(mode)) return
   if (logMode.value === mode) return
   logMode.value = mode
   const svc = selectedService.value
   if (!svc) return
+  // 重置通用状态
+  logLevelFilter.value = 'ALL'
+  logSearch.value = ''
+  searchMatches.value[svc] = []
+  currentMatchIndex.value[svc] = -1
+
   if (mode === 'live') {
-    // 切回 live: 恢复实时接收，但保持当前查看位置不被重置
     logPaused.value = false
     followLogs.value = true
+    logs.value[svc] = []
+    logsMeta.value[svc] = { total: 0, offset: 0 }
     connectLogWebSocket(svc)
   } else {
-    // 切到 history: 断开实时连接并进入暂停状态、关闭 follow
-    if (logSocket) {
-      logSocket.close()
-      logSocket = null
-      logSocketService = null
-    }
-    logPaused.value = true
+    // 断开 WS
+    if (logSocket) { logSocket.close(); logSocket = null; logSocketService = null }
+    logPaused.value = false
     followLogs.value = false
     loadLogs(svc)
   }
@@ -3762,7 +3863,6 @@ let cpuChart = null
 let memoryChart = null
 let diskChart = null
 let metricsResizeHandler = null
-let logsScrollCleanup = null
 const statusAlertTimers = ref({})
 let statusAlertRepeatTimer = null
 
@@ -4970,28 +5070,7 @@ const closeMetrics = () => {
   }
 }
 
-// 监听日志模式变化，切换时进行必要的连接/加载
-watch(logMode, (mode) => {
-  const svc = selectedService.value
-  if (!svc) return
-  if (mode === 'live') {
-    logs.value[svc] = []
-    connectLogWebSocket(svc)
-    // live mode - ensure not paused by default
-    logPaused.value = false
-  } else {
-    if (logSocket) {
-      logSocket.close()
-      logSocket = null
-      logSocketService = null
-    }
-    // 切换到历史模式，加载最近日志并刷新分级统计
-    loadLogs(svc)
-    fetchLogLevelCounts(svc)
-    // 历史模式默认暂停监控
-    logPaused.value = true
-  }
-})
+// watch(logMode) 已移除 —— 所有模式切换逻辑由 setLogMode 统一处理
 
 // 全局搜索所有日志内容
 const displayedLogs = computed(() => {
@@ -5022,8 +5101,8 @@ const getLogLevelCount = (level) => {
   if (logMode.value === 'history') {
     return logLevelCounts.value[level] || 0
   }
-  // 实时模式：使用当前展示数据统计
-  return filteredDisplayedLogs.value.filter(l => l.level === level).length
+  // 实时模式：使用当前缓冲区内全部日志统计（displayedLogs 未经级别过滤）
+  return displayedLogs.value.filter(l => l.level === level).length
 }
 
 // 拉取后端分级统计
@@ -5042,7 +5121,10 @@ const fetchLogLevelCounts = async (service) => {
 
 // 监听 selectedService 变化以便在 live 模式下建立 WebSocket 连接并在关闭时清理
 watch(selectedService, (service) => {
-  fetchLogLevelCounts(service)
+  // History 模式下拉取后端统计；Live 模式由 computed 本地统计，无需请求
+  if (service && logMode.value === 'history') {
+    fetchLogLevelCounts(service)
+  }
   if (!service) {
     if (logSocket) {
       logSocket.close()
@@ -5074,12 +5156,6 @@ watch(logSearch, (keyword) => {
     if (logMode.value === 'history') {
       if (logSearchInProgress) return
       logSearchInProgress = true
-      if (!logPaused.value) {
-        logPaused.value = true
-        if (logSocket && logSocket.readyState === 1) {
-          logSocket.send(JSON.stringify({ action: 'pause' }))
-        }
-      }
       logsLoading.value[service] = true
       try {
         if (!keyword) {
@@ -5120,24 +5196,29 @@ watch(logSearch, (keyword) => {
         logSearchInProgress = false
       }
     } else {
-      // 实时模式：本地匹配当前已接收的 logs
+      // 实时模式：本地匹配当前缓冲区内的 logs（不请求后端）
       if (!keyword) {
         searchMatches.value[service] = []
         currentMatchIndex.value[service] = -1
-        logsLoading.value[service] = false
         return
       }
       const matches = []
-      const list = logs.value[service] || []
-      list.forEach((log) => {
+      const list = filteredDisplayedLogs.value
+      list.forEach((log, idx) => {
         if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-          if (typeof log.line === 'number') matches.push(log.line - 1)
+          matches.push(idx)  // 存储在 filteredDisplayedLogs 中的索引
         }
       })
       searchMatches.value[service] = matches
       currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
       await nextTick()
-      if (matches.length > 0) jumpToLogLine(matches[0])
+      // 滚动到第一个匹配项
+      if (matches.length > 0 && logsContainer.value) {
+        const lineNode = logsContainer.value.children?.[matches[0]]
+        if (lineNode) {
+          try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
+        }
+      }
     }
   }, 500)
 })
@@ -5242,7 +5323,12 @@ const jumpToNextMatch = () => {
   const current = currentMatchIndex.value[service] ?? -1
   const nextIndex = current < matches.length - 1 ? current + 1 : 0
   currentMatchIndex.value[service] = nextIndex
-  jumpToLogLine(matches[nextIndex])
+  if (logMode.value === 'live') {
+    // Live 模式：matches 存储的是 filteredDisplayedLogs 内的索引，直接滚动
+    scrollToLocalMatch(matches[nextIndex])
+  } else {
+    jumpToLogLine(matches[nextIndex])
+  }
 }
 
 const jumpToPrevMatch = () => {
@@ -5253,7 +5339,20 @@ const jumpToPrevMatch = () => {
   const current = currentMatchIndex.value[service] ?? 0
   const prevIndex = current > 0 ? current - 1 : matches.length - 1
   currentMatchIndex.value[service] = prevIndex
-  jumpToLogLine(matches[prevIndex])
+  if (logMode.value === 'live') {
+    scrollToLocalMatch(matches[prevIndex])
+  } else {
+    jumpToLogLine(matches[prevIndex])
+  }
+}
+
+// Live 模式本地滚动到匹配行
+const scrollToLocalMatch = (localIdx) => {
+  if (!logsContainer.value) return
+  const lineNode = logsContainer.value.children?.[localIdx]
+  if (lineNode) {
+    try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
+  }
 }
 
 // Methods
@@ -5293,15 +5392,25 @@ const refreshStatus = async () => {
 
 const loadLogs = async (service) => {
   selectedService.value = service
-  // history 模式默认暂停，live 模式默认不暂停并开启 follow
-  logPaused.value = (logMode.value === 'history')
-  if (logMode.value === 'live') followLogs.value = true
+  // 状态（logPaused / followLogs）由 setLogMode 统一管理，此处仅负责数据加载
   logSearch.value = ''
   logsLoading.value[service] = true
   logs.value[service] = []
   logOffset.value[service] = 0
   logHasMorePrev.value[service] = false
   logHasMoreNext.value[service] = false
+
+  // ═══ Live 模式：仅初始化空缓冲区，WS 由 watch(selectedService) 自动建立 ═══
+  if (logMode.value === 'live') {
+    logPaused.value = false
+    followLogs.value = true
+    logsMeta.value[service] = { total: 0, offset: 0 }
+    logsLoading.value[service] = false
+    // WS 连接由 watch(selectedService) 触发，此处无需重复
+    return
+  }
+
+  // ═══ History 模式：从后端加载 ═══
   try {
     // If a non-ALL level is selected, load recent 200 lines for that level
     if (logLevelFilter.value && logLevelFilter.value !== 'ALL') {
@@ -5319,8 +5428,6 @@ const loadLogs = async (service) => {
     logHasMoreNext.value[service] = data.has_more_next
     await nextTick()
     scrollLogsToBottom()
-    // WebSocket 连接已移至 watch 中管理
-    // connectLogWebSocket(service)
   } catch (error) {
     console.error('Error loading logs:', error)
     showNotification(t('logs_load_failed'), 'error')
@@ -5426,18 +5533,19 @@ const controlService = async (action, service) => {
   }
 }
 
+// ═══ 暂停/继续（仅 Live 模式有意义） ═══
 const togglePause = async () => {
+  if (logMode.value !== 'live') return
   logPaused.value = !logPaused.value
-  if (logSocket && logSocket.readyState === 1) { // 1: OPEN
+  if (logSocket && logSocket.readyState === 1) {
     logSocket.send(JSON.stringify({ action: logPaused.value ? 'pause' : 'resume' }))
   }
   if (logPaused.value) {
-    // 暂停时关闭跟随，方便查看历史
     followLogs.value = false
   } else {
-    // 恢复时打开跟随并滚到底部
     followLogs.value = true
-    await goToBottom({ keepPaused: true })
+    await nextTick()
+    scrollLogsToBottom()
   }
 }
 
@@ -5509,21 +5617,15 @@ const getLogColor = (level) => {
 const goToBottom = async (options = {}) => {
   const service = selectedService.value
   if (!service) return
-  const { keepPaused = false } = options
-  // Live mode: simply scroll to bottom of current displayed logs (respect current level filter) without fetching
+  // Live mode: simply scroll to bottom of current displayed logs
   if (logMode.value === 'live') {
+    followLogs.value = true
     await nextTick()
     if (!logsContainer.value) return
-    // scroll to bottom of displayed (filtered) logs
     logsContainer.value.scrollTop = logsContainer.value.scrollHeight
     return
   }
-  if (!keepPaused && !logPaused.value) {
-    logPaused.value = true
-    if (logSocket && logSocket.readyState === 1) {
-      logSocket.send(JSON.stringify({ action: 'pause' }))
-    }
-  }
+  // History mode: fetch the last page from backend
   logsLoading.value[service] = true
   try {
     const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
@@ -5549,19 +5651,15 @@ const goToBottom = async (options = {}) => {
 const goToTop = async () => {
   const service = selectedService.value
   if (!service) return
-  // Live mode: scroll to top of currently displayed logs
+  // Live mode: scroll to top of currently displayed logs, disable follow
   if (logMode.value === 'live') {
+    followLogs.value = false
     await nextTick()
     if (!logsContainer.value) return
     logsContainer.value.scrollTop = 0
     return
   }
-  if (!logPaused.value) {
-    logPaused.value = true
-    if (logSocket && logSocket.readyState === 1) {
-      logSocket.send(JSON.stringify({ action: 'pause' }))
-    }
-  }
+  // History mode: fetch the first page from backend
   logsLoading.value[service] = true
   try {
     const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
@@ -5595,34 +5693,7 @@ const scrollLogsToTop = () => {
   }
 }
 
-const attachLogsScrollListener = () => {
-  const container = logsContainer.value
-  if (!container) return
-  const handler = () => {
-    const service = selectedService.value
-    if (!service) return
-    if (container.scrollTop === 0 && logHasMorePrev.value[service]) {
-      fetchMoreLogs('prev')
-    } else if (
-      container.scrollTop + container.clientHeight >= container.scrollHeight - 2 &&
-      logHasMoreNext.value[service]
-    ) {
-      fetchMoreLogs('next')
-    }
-  }
-  container.addEventListener('scroll', handler, { passive: true })
-  logsScrollCleanup = () => {
-    container.removeEventListener('scroll', handler)
-    logsScrollCleanup = null
-  }
-}
-
-watch(logsContainer, (container) => {
-  logsScrollCleanup?.()
-  if (container) {
-    attachLogsScrollListener()
-  }
-})
+// attachLogsScrollListener 已移除 —— 滚动事件由模板 @scroll="onLogsScroll" 统一处理
 
 const showNotification = (message, type = 'success', details = null) => {
   notification.value = { message, type, details }
@@ -5714,7 +5785,6 @@ onMounted(() => {
 onUnmounted(() => {
   cleanupRealtime()
   if (logsInterval) clearInterval(logsInterval)
-  logsScrollCleanup?.()
   Object.keys(statusAlertTimers.value).forEach((key) => {
     if (statusAlertTimers.value[key]) clearTimeout(statusAlertTimers.value[key])
   })
