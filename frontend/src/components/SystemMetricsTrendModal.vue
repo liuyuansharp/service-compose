@@ -72,7 +72,7 @@ defineProps({
   trendRangeOptions: { type: Array, required: true },
   trendLoading: { type: Boolean, required: true },
   trendData: { type: Array, required: true },
-  trendChartRef: { type: [Object, Function], required: true },
+  trendChartRef: { type: [Object, Function, null], default: null },
   t: { type: Function, required: true },
   onClose: { type: Function, required: true },
   onSelectRange: { type: Function, required: true },

@@ -140,7 +140,7 @@
 defineProps({
   showPidTree: { type: Boolean, required: true },
   pidTreeService: { type: String, required: true },
-  pidTreeData: { type: Object, required: true },
+  pidTreeData: { type: [Object, null], default: null },
   pidTreeLoading: { type: Boolean, required: true },
   onClose: { type: Function, required: true },
   canOperate: { type: Boolean, required: true },
