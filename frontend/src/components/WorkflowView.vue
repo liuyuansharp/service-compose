@@ -1,114 +1,326 @@
 <template>
-  <div class="tech-card rounded-md p-4 sm:p-5">
-    <div class="flex items-center justify-between mb-3">
-      <div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">{{ title }}</h3>
-        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ subtitle }}</p>
-      </div>
-      <button
-        class="px-2.5 py-1.5 rounded-md text-xs font-medium bg-slate-700/80 text-white hover:bg-slate-700 transition"
-        @click="$emit('refresh')"
-      >
-        {{ refreshLabel }}
-      </button>
-    </div>
-    <div v-if="!graph?.nodes?.length" class="text-sm text-gray-500 dark:text-slate-400 py-10 text-center">
+  <div class="workflow-wrapper">
+    <!-- Empty state -->
+    <div v-if="!levels.length" class="text-sm text-gray-500 dark:text-slate-400 py-10 text-center">
       {{ emptyLabel }}
     </div>
-    <div v-else ref="chartRef" class="h-[420px] w-full"></div>
+
+    <!-- Topology layout -->
+    <div v-else class="relative overflow-x-auto pb-4">
+      <!-- SVG connector layer (positioned behind cards) -->
+      <svg
+        class="absolute inset-0 pointer-events-none"
+        :width="svgWidth"
+        :height="svgHeight"
+        style="z-index: 0;"
+      >
+        <defs>
+          <marker id="wf-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0 L10 4 L0 8 Z" :fill="dark ? '#64748b' : '#94a3b8'" />
+          </marker>
+        </defs>
+        <path
+          v-for="(line, li) in connectorPaths"
+          :key="li"
+          :d="line.d"
+          fill="none"
+          :stroke="dark ? '#475569' : '#cbd5e1'"
+          stroke-width="1.5"
+          marker-end="url(#wf-arrow)"
+        />
+      </svg>
+
+      <!-- Card levels (rows) -->
+      <div class="relative" style="z-index: 1;">
+        <div
+          v-for="(level, levelIdx) in levels"
+          :key="levelIdx"
+          class="flex items-start justify-center gap-4 sm:gap-5 flex-wrap"
+          :class="levelIdx > 0 ? 'mt-10 sm:mt-12' : ''"
+        >
+          <div
+            v-for="nodeName in level"
+            :key="nodeName"
+            :ref="el => setNodeRef(nodeName, el)"
+            class="workflow-card tech-card rounded-lg p-3 sm:p-4 transition-all w-[250px] sm:w-[270px] flex-shrink-0"
+            :class="[
+              getServiceBorderClass(getServiceData(nodeName)),
+              getHealthBgClass(getHealthState(getServiceData(nodeName))),
+            ]"
+          >
+            <!-- Card header: name + status + actions -->
+            <div class="flex justify-between items-start mb-2.5">
+              <div class="min-w-0 flex-1">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{{ nodeName }}</h4>
+                <p class="text-[11px] flex items-center gap-1 mt-0.5" :class="getServiceHealthTextClass(getServiceData(nodeName))">
+                  <span class="inline-block w-1.5 h-1.5 rounded-full"
+                    :class="{
+                      'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]': getHealthState(getServiceData(nodeName)) === 'running',
+                      'bg-yellow-400 shadow-[0_0_4px_rgba(250,204,21,0.5)]': getHealthState(getServiceData(nodeName)) === 'abnormal',
+                      'bg-gray-400': getHealthState(getServiceData(nodeName)) === 'stopped',
+                    }"
+                  ></span>
+                  <span>{{ getServiceHealthLabel(getServiceData(nodeName)) }}</span>
+                </p>
+              </div>
+              <!-- Compact action buttons -->
+              <div class="flex items-center gap-1 ml-2 flex-shrink-0">
+                <button
+                  v-if="getServiceData(nodeName).running && canOperate"
+                  @click="$emit('control', 'stop', nodeName)"
+                  class="p-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition glass-button-solid"
+                  :disabled="controlling"
+                  :title="stopLabel"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                </button>
+                <button
+                  v-else-if="!getServiceData(nodeName).running && canOperate"
+                  @click="$emit('control', 'start', nodeName)"
+                  class="p-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition glass-button-solid"
+                  :disabled="controlling"
+                  :title="startLabel"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 6l10 6-10 6z" /></svg>
+                </button>
+                <button
+                  @click="$emit('open-info', nodeName)"
+                  class="p-1 bg-slate-600 text-white rounded text-xs hover:bg-slate-700 transition glass-button-solid"
+                  :title="infoLabel"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 10v6" /><path d="M12 7h.01" /></svg>
+                </button>
+                <button
+                  @click="$emit('open-metrics', nodeName)"
+                  class="p-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition glass-button-solid"
+                  :title="metricsLabel"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V6" /><path d="M4 18h16" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+                </button>
+                <button
+                  @click="$emit('open-logs', nodeName)"
+                  class="p-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition glass-button-solid"
+                  :title="logsLabel"
+                >
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h7l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" /><path d="M9 12h6" /><path d="M9 16h6" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card body: PID / uptime / depends -->
+            <div class="space-y-1.5 text-[11px]">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500 dark:text-slate-400">PID</span>
+                <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).pid || '—' }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500 dark:text-slate-400">{{ uptimeLabel }}</span>
+                <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).uptime || '—' }}</span>
+              </div>
+              <div v-if="getNodeDeps(nodeName).length" class="flex items-start gap-1 pt-0.5">
+                <span class="text-gray-400 dark:text-slate-500 flex-shrink-0 mt-px">
+                  <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6" /></svg>
+                </span>
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="dep in getNodeDeps(nodeName)"
+                    :key="dep"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    :class="isDepRunning(dep)
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'"
+                  >{{ dep }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, watch, ref } from 'vue'
-import * as echarts from 'echarts'
+import { computed, ref, onMounted, onUpdated, onBeforeUnmount, nextTick, watch } from 'vue'
 
 const props = defineProps({
   graph: { type: Object, default: () => ({ nodes: [], edges: [] }) },
+  services: { type: Array, default: () => [] },
   dark: { type: Boolean, default: false },
-  title: { type: String, default: '' },
-  subtitle: { type: String, default: '' },
   emptyLabel: { type: String, default: '' },
-  refreshLabel: { type: String, default: '' },
+  canOperate: { type: Boolean, default: false },
+  controlling: { type: Boolean, default: false },
+  // Button labels
+  startLabel: { type: String, default: 'Start' },
+  stopLabel: { type: String, default: 'Stop' },
+  infoLabel: { type: String, default: 'Info' },
+  metricsLabel: { type: String, default: 'Metrics' },
+  logsLabel: { type: String, default: 'Logs' },
+  uptimeLabel: { type: String, default: 'Uptime' },
+  // Health helper functions passed from parent
+  getHealthState: { type: Function, default: () => () => 'stopped' },
+  getServiceHealthLabel: { type: Function, default: () => () => '' },
+  getServiceHealthTextClass: { type: Function, default: () => () => '' },
+  getServiceBorderClass: { type: Function, default: () => () => '' },
+  getHealthBgClass: { type: Function, default: () => () => '' },
 })
 
-const chartRef = ref(null)
-let chart = null
+defineEmits(['control', 'open-info', 'open-metrics', 'open-logs'])
 
-const buildOption = () => {
-  const nodes = (props.graph?.nodes || []).map((n) => ({
-    id: n.id,
-    name: n.label,
-    value: n.depends_on?.length || 0,
-    symbolSize: 40 + Math.min((n.depends_on?.length || 0) * 6, 30),
-    itemStyle: {
-      color: props.dark ? '#60a5fa' : '#2563eb',
-    },
-    label: {
-      color: props.dark ? '#e2e8f0' : '#1f2937',
-      fontSize: 12,
-    },
-  }))
+// Build a name→service lookup from the live services array
+const serviceMap = computed(() => {
+  const m = new Map()
+  for (const s of props.services) {
+    m.set(s.name, s)
+  }
+  return m
+})
 
-  const links = (props.graph?.edges || []).map((e) => ({
-    source: e.from,
-    target: e.to,
-    lineStyle: {
-      color: props.dark ? '#94a3b8' : '#64748b',
-      width: 1.5,
+const getServiceData = (name) => serviceMap.value.get(name) || { name, running: false, pid: null, uptime: null, health: 'stopped' }
+
+// Dependency info per node from graph data
+const nodeDepsMap = computed(() => {
+  const m = {}
+  for (const n of (props.graph?.nodes || [])) {
+    m[n.id] = n.depends_on || []
+  }
+  return m
+})
+const getNodeDeps = (name) => nodeDepsMap.value[name] || []
+
+const isDepRunning = (name) => {
+  const svc = serviceMap.value.get(name)
+  return svc ? props.getHealthState(svc) === 'running' : false
+}
+
+// ---- Topological leveling (Kahn's algorithm) ----
+const levels = computed(() => {
+  const nodes = props.graph?.nodes || []
+  if (!nodes.length) return []
+
+  const names = new Set(nodes.map(n => n.id))
+  const deps = {} // name → [deps]
+  const revDeps = {} // name → [dependents]
+  const inDeg = {}
+
+  for (const n of nodes) {
+    deps[n.id] = (n.depends_on || []).filter(d => names.has(d))
+    revDeps[n.id] = []
+    inDeg[n.id] = 0
+  }
+  for (const n of nodes) {
+    for (const d of deps[n.id]) {
+      inDeg[n.id]++
+      if (revDeps[d]) revDeps[d].push(n.id)
     }
-  }))
+  }
 
-  return {
-    backgroundColor: 'transparent',
-    tooltip: {
-      formatter: (params) => params.data?.name || params.data?.id
-    },
-    series: [
-      {
-        type: 'graph',
-        layout: 'force',
-        data: nodes,
-        links,
-        roam: true,
-        force: {
-          repulsion: 240,
-          edgeLength: 120,
-        },
-        label: { show: true },
-        edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: 8,
+  const result = []
+  let ready = [...names].filter(n => inDeg[n] === 0).sort()
+  let visited = 0
+
+  while (ready.length) {
+    result.push([...ready])
+    const next = []
+    for (const n of ready) {
+      visited++
+      for (const dep of (revDeps[n] || [])) {
+        inDeg[dep]--
+        if (inDeg[dep] === 0) next.push(dep)
       }
-    ]
+    }
+    ready = next.sort()
   }
+
+  // Append any remaining nodes (cycle fallback)
+  if (visited < names.size) {
+    const placed = new Set(result.flat())
+    const rest = [...names].filter(n => !placed.has(n)).sort()
+    if (rest.length) result.push(rest)
+  }
+
+  return result
+})
+
+// ---- SVG connector lines ----
+const nodeRefs = {}
+const setNodeRef = (name, el) => {
+  if (el) nodeRefs[name] = el
+  else delete nodeRefs[name]
 }
 
-const renderChart = () => {
-  if (!chartRef.value) return
-  if (!chart) {
-    chart = echarts.init(chartRef.value)
+const svgWidth = ref(0)
+const svgHeight = ref(0)
+const connectorPaths = ref([])
+
+const calcConnectors = () => {
+  const edges = props.graph?.edges || []
+  if (!edges.length || !Object.keys(nodeRefs).length) {
+    connectorPaths.value = []
+    return
   }
-  chart.setOption(buildOption(), true)
+
+  const wrapper = Object.values(nodeRefs)[0]?.closest('.workflow-wrapper')
+  if (!wrapper) return
+  const wrapperRect = wrapper.getBoundingClientRect()
+  svgWidth.value = wrapper.scrollWidth
+  svgHeight.value = wrapper.scrollHeight
+
+  const paths = []
+  for (const edge of edges) {
+    const fromEl = nodeRefs[edge.from]
+    const toEl = nodeRefs[edge.to]
+    if (!fromEl || !toEl) continue
+
+    const fromRect = fromEl.getBoundingClientRect()
+    const toRect = toEl.getBoundingClientRect()
+
+    // From bottom-center of source → top-center of target
+    const x1 = fromRect.left + fromRect.width / 2 - wrapperRect.left
+    const y1 = fromRect.bottom - wrapperRect.top
+    const x2 = toRect.left + toRect.width / 2 - wrapperRect.left
+    const y2 = toRect.top - wrapperRect.top
+
+    const midY = (y1 + y2) / 2
+    paths.push({
+      d: `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`
+    })
+  }
+
+  connectorPaths.value = paths
 }
 
+const scheduleCalc = () => {
+  nextTick(() => {
+    requestAnimationFrame(calcConnectors)
+  })
+}
+
+onMounted(scheduleCalc)
+onUpdated(scheduleCalc)
+
+// Recalculate when data changes
+watch(() => [props.graph, props.services], scheduleCalc, { deep: true })
+
+// Recalculate on resize
+let _resizeObserver = null
 onMounted(() => {
-  renderChart()
-  window.addEventListener('resize', handleResize)
+  nextTick(() => {
+    const wrapper = document.querySelector('.workflow-wrapper')
+    if (wrapper && typeof ResizeObserver !== 'undefined') {
+      _resizeObserver = new ResizeObserver(scheduleCalc)
+      _resizeObserver.observe(wrapper)
+    }
+  })
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (chart) {
-    chart.dispose()
-    chart = null
-  }
+  if (_resizeObserver) _resizeObserver.disconnect()
 })
-
-const handleResize = () => {
-  if (chart) chart.resize()
-}
-
-watch(() => [props.graph, props.dark], () => {
-  renderChart()
-}, { deep: true })
 </script>
+
+<style scoped>
+.workflow-card {
+  position: relative;
+}
+</style>

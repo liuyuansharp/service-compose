@@ -542,7 +542,7 @@
             </div>
           </div>
         </div>
-        <div v-if="serviceViewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div v-show="serviceViewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div
             v-for="service in visibleServices"
             :key="service.name"
@@ -663,15 +663,29 @@
             </div>
           </div>
         </div>
-        <div v-else class="mt-3">
+        <div v-show="serviceViewMode === 'workflow'" class="mt-3">
           <WorkflowView
             :graph="serviceGraph"
+            :services="visibleServices"
             :dark="isDark"
-            :title="t('workflow_title')"
-            :subtitle="t('workflow_subtitle')"
+            :can-operate="canOperate"
+            :controlling="controlling"
             :empty-label="serviceGraphLoading ? t('workflow_loading') : t('workflow_empty')"
-            :refresh-label="t('workflow_refresh')"
-            @refresh="loadServiceGraph"
+            :start-label="t('start')"
+            :stop-label="t('stop')"
+            :info-label="t('info')"
+            :metrics-label="t('metrics')"
+            :logs-label="t('logs')"
+            :uptime-label="t('uptime') || 'Uptime'"
+            :get-health-state="getHealthState"
+            :get-service-health-label="getServiceHealthLabel"
+            :get-service-health-text-class="getServiceHealthTextClass"
+            :get-service-border-class="getServiceBorderClass"
+            :get-health-bg-class="getHealthBgClass"
+            @control="controlService"
+            @open-info="openServiceInfo"
+            @open-metrics="openMetrics"
+            @open-logs="loadLogs"
           />
         </div>
       </div>
@@ -5463,10 +5477,8 @@ const loadServiceGraph = async () => {
 }
 
 watch(serviceViewMode, (mode) => {
-  if (mode === 'workflow' && !serviceGraphLoading.value) {
-    if (!serviceGraph.value?.nodes?.length) {
-      loadServiceGraph()
-    }
+  if (mode === 'workflow') {
+    loadServiceGraph()
   }
 })
 
