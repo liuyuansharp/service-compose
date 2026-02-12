@@ -140,7 +140,7 @@
       </div>
       <div class="relative z-10">
     <!-- Header -->
-    <header class="tech-header border-b border-white/10">
+    <header v-if="!isPopoutMode" class="tech-header border-b border-white/10">
   <div class="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div class="flex-shrink-0">
@@ -249,11 +249,11 @@
     </header>
 
     <!-- Main Content -->
-  <main class="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+  <main :class="isPopoutMode ? 'px-2 py-2' : 'max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6'">
       <div class="tech-shell">
-        <div class="tech-ornament"></div>
+        <div v-if="!isPopoutMode" class="tech-ornament"></div>
       <div
-        v-if="hasCriticalAlert"
+        v-if="hasCriticalAlert && !isPopoutMode"
         class="mb-4 rounded-md border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-950/40 px-4 py-2 text-sm text-red-700 dark:text-red-200"
       >
         <div class="flex items-center justify-between gap-3">
@@ -268,7 +268,7 @@
         </div>
       </div>
       <!-- Status Overview Cards -->
-  <div v-if="isCardVisible('overview')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
+  <div v-if="isCardVisible('overview') && !isPopoutMode" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <!-- Overall Status -->
   <div class="tech-card rounded-md p-4 border-l-4" :class="overallStatusBorder">
           <div class="flex items-center justify-between">
@@ -330,7 +330,7 @@
       </div>
 
       <!-- System Metrics Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
+  <div v-if="!isPopoutMode" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <!-- CPU Monitor -->
   <div class="tech-card rounded-md p-4 border-t-4 border-blue-500">
           <div class="flex items-center justify-between mb-4">
@@ -469,8 +469,8 @@
       </div>
 
       <!-- Services Grid -->
-      <div class="mb-6">
-        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <div :class="isPopoutMode ? '' : 'mb-6'">
+        <div v-if="!isPopoutMode" class="flex items-center justify-between mb-3 flex-wrap gap-2">
           <!-- Left: Title + count badge -->
           <div class="flex items-center gap-2">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">{{ t('services') }}</h2>
@@ -542,7 +542,7 @@
             </div>
           </div>
         </div>
-        <div v-show="serviceViewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div v-show="serviceViewMode === 'list' && !isPopoutMode" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div
             v-for="service in visibleServices"
             :key="service.name"
@@ -663,11 +663,12 @@
             </div>
           </div>
         </div>
-        <div v-show="serviceViewMode === 'workflow'" class="mt-3">
+        <div v-show="serviceViewMode === 'workflow' || isPopoutMode" :class="isPopoutMode ? '' : 'mt-3'">
           <WorkflowView
             :graph="serviceGraph"
             :services="visibleServices"
             :dark="isDark"
+            :is-popout="isPopoutMode"
             :can-operate="canOperate"
             :controlling="controlling"
             :empty-label="serviceGraphLoading ? t('workflow_loading') : t('workflow_empty')"
@@ -679,15 +680,22 @@
             :uptime-label="t('uptime') || 'Uptime'"
             :topo-label="t('workflow_topo')"
             :force-label="t('workflow_force')"
+            :popout-label="t('workflow_popout')"
+            :pid-tree-label="t('pid_tree')"
+            :last-log-label="t('last_log')"
+            :no-logs-label="t('no_logs_yet')"
             :get-health-state="getHealthState"
             :get-service-health-label="getServiceHealthLabel"
             :get-service-health-text-class="getServiceHealthTextClass"
             :get-service-border-class="getServiceBorderClass"
             :get-health-bg-class="getHealthBgClass"
+            :get-service-uptime-display="getServiceUptimeDisplay"
             @control="controlService"
             @open-info="openServiceInfo"
             @open-metrics="openMetrics"
             @open-logs="loadLogs"
+            @open-pid-tree="openPidTree"
+            @popout="popoutWorkflow"
           />
         </div>
       </div>
@@ -2568,6 +2576,7 @@ const translations = {
   workflow_load_failed: '工作流加载失败',
   workflow_topo: '拓扑布局',
   workflow_force: '力导向图',
+  workflow_popout: '独立窗口',
     history: '历史',
     range_1h: '近 1 小时',
     range_6h: '近 6 小时',
@@ -2883,6 +2892,7 @@ const translations = {
   workflow_load_failed: 'Failed to load workflow',
   workflow_topo: 'Topology',
   workflow_force: 'Force Graph',
+  workflow_popout: 'Pop out',
     history: 'History',
     range_1h: 'Last 1h',
     range_6h: 'Last 6h',
@@ -3377,6 +3387,7 @@ const bootstrapSession = async () => {
 
 // State
 const servicesStatus = ref([])
+const isPopoutMode = ref(false)
 const serviceViewMode = ref('list') // 'list' | 'workflow'
 const serviceGraph = ref({ nodes: [], edges: [] })
 const serviceGraphLoading = ref(false)
@@ -3689,6 +3700,25 @@ ${xtermCss}
     }
   }
   setTimeout(setupPopupTerminal, 200)
+}
+
+function popoutWorkflow() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'workflow')
+  const w = 1200, h = 820
+  const left = (screen.width - w) / 2, top = (screen.height - h) / 2
+  window.open(url.toString(), '_blank',
+    `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`)
+}
+
+function applyWorkflowViewFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('view') === 'workflow') {
+      serviceViewMode.value = 'workflow'
+      isPopoutMode.value = true
+    }
+  } catch (_) {}
 }
 
 watch(showTerminal, (val) => {
@@ -5900,6 +5930,7 @@ watch(
 )
 
 onMounted(() => {
+  applyWorkflowViewFromUrl()
   bootstrapSession()
 })
 

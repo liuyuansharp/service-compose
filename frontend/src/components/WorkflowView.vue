@@ -1,27 +1,37 @@
 <template>
   <div class="workflow-wrapper">
-    <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center justify-between mb-3 gap-2">
       <div class="text-xs text-gray-500 dark:text-slate-400">
         <span v-if="!levels.length">{{ emptyLabel }}</span>
       </div>
-      <div v-if="levels.length" class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
+      <div v-if="levels.length" class="flex items-center gap-1.5">
+        <div class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
+          <button
+            @click="viewMode = 'topo'"
+            class="px-2 py-1 text-xs rounded transition"
+            :class="viewMode === 'topo'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+          >
+            {{ topoLabel }}
+          </button>
+          <button
+            @click="viewMode = 'force'"
+            class="px-2 py-1 text-xs rounded transition"
+            :class="viewMode === 'force'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+          >
+            {{ forceLabel }}
+          </button>
+        </div>
         <button
-          @click="viewMode = 'topo'"
-          class="px-2 py-1 text-xs rounded transition"
-          :class="viewMode === 'topo'
-            ? 'bg-blue-600 text-white shadow-sm'
-            : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+          v-if="!isPopout"
+          @click="$emit('popout')"
+          class="p-1.5 rounded border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-slate-100 hover:bg-slate-100/60 dark:hover:bg-slate-700/40"
+          :title="popoutLabel"
         >
-          {{ topoLabel }}
-        </button>
-        <button
-          @click="viewMode = 'force'"
-          class="px-2 py-1 text-xs rounded transition"
-          :class="viewMode === 'force'
-            ? 'bg-blue-600 text-white shadow-sm'
-            : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
-        >
-          {{ forceLabel }}
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7" /><path d="M10 14L21 3" /><path d="M21 14v7h-7" /><path d="M3 10v11h11" /></svg>
         </button>
       </div>
     </div>
@@ -128,14 +138,33 @@
               </div>
             </div>
 
-            <div class="space-y-1.5 text-[11px]">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500 dark:text-slate-400">PID</span>
-                <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).pid || '—' }}</span>
+            <div class="space-y-2.5 text-[11px]">
+              <div>
+                <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-400">PID</div>
+                <div class="flex items-center justify-between gap-2 mt-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).pid || '—' }}</span>
+                    <button
+                      v-if="getServiceData(nodeName).pid"
+                      @click="$emit('open-pid-tree', nodeName)"
+                      class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-0.5"
+                      :title="pidTreeLabel"
+                    >
+                      <svg viewBox="0 0 24 24" class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
+                        <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
+                      </svg>
+                      {{ pidTreeLabel }}
+                    </button>
+                  </div>
+                  <span class="text-[10px] text-gray-500 dark:text-slate-400">{{ uptimeLabel }}: {{ getServiceUptimeDisplay(getServiceData(nodeName)) }}</span>
+                </div>
               </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500 dark:text-slate-400">{{ uptimeLabel }}</span>
-                <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).uptime || '—' }}</span>
+              <div>
+                <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-400">{{ lastLogLabel }}</div>
+                <p class="text-[11px] font-mono text-gray-700 dark:text-slate-300 truncate">
+                  {{ getServiceData(nodeName).last_log || noLogsLabel }}
+                </p>
               </div>
               <div v-if="getNodeDeps(nodeName).length" class="flex items-start gap-1 pt-0.5">
                 <span class="text-gray-400 dark:text-slate-500 flex-shrink-0 mt-px">
@@ -173,6 +202,7 @@ const props = defineProps({
   graph: { type: Object, default: () => ({ nodes: [], edges: [] }) },
   services: { type: Array, default: () => [] },
   dark: { type: Boolean, default: false },
+  isPopout: { type: Boolean, default: false },
   emptyLabel: { type: String, default: '' },
   canOperate: { type: Boolean, default: false },
   controlling: { type: Boolean, default: false },
@@ -184,14 +214,19 @@ const props = defineProps({
   uptimeLabel: { type: String, default: 'Uptime' },
   topoLabel: { type: String, default: 'Topology' },
   forceLabel: { type: String, default: 'Force' },
+  popoutLabel: { type: String, default: 'Pop out' },
+  pidTreeLabel: { type: String, default: 'PID Tree' },
+  lastLogLabel: { type: String, default: 'Last Log' },
+  noLogsLabel: { type: String, default: 'No logs yet' },
   getHealthState: { type: Function, default: () => () => 'stopped' },
   getServiceHealthLabel: { type: Function, default: () => () => '' },
   getServiceHealthTextClass: { type: Function, default: () => () => '' },
   getServiceBorderClass: { type: Function, default: () => () => '' },
   getHealthBgClass: { type: Function, default: () => () => '' },
+  getServiceUptimeDisplay: { type: Function, default: () => () => '—' },
 })
 
-defineEmits(['control', 'open-info', 'open-metrics', 'open-logs'])
+defineEmits(['control', 'open-info', 'open-metrics', 'open-logs', 'open-pid-tree', 'popout'])
 
 const viewMode = ref('topo')
 
@@ -203,7 +238,7 @@ const serviceMap = computed(() => {
   return m
 })
 
-const getServiceData = (name) => serviceMap.value.get(name) || { name, running: false, pid: null, uptime: null, health: 'stopped' }
+const getServiceData = (name) => serviceMap.value.get(name) || { name, running: false, pid: null, uptime: null, last_log: null, health: 'stopped' }
 
 const nodeDepsMap = computed(() => {
   const m = {}
