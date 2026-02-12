@@ -2387,7 +2387,8 @@ async def get_logs(
         else:
             filtered_indexed_logs = indexed_logs
         
-        # Pagination
+        # Pagination — 对过滤后的结果统一分页
+        # filtered_indexed_logs 是经过 level + time_cutoff + search 过滤后的完整列表
         try:
             n_lines = int(lines)
         except Exception:
@@ -2395,7 +2396,9 @@ async def get_logs(
         if n_lines > 0:
             n_lines = min(n_lines, MAX_LOG_LINES)
 
-        if search:
+        # 当存在任何过滤条件时（search / level / time_cutoff），
+        # 以过滤后的列表长度为分页基准
+        if search or level or time_cutoff:
             filtered_total = len(filtered_indexed_logs)
             if n_lines <= 0 or str(lines).lower() == "all":
                 logs_to_return = filtered_indexed_logs
@@ -2404,11 +2407,12 @@ async def get_logs(
                 if offset < 0:
                     start = max(filtered_total + offset, 0)
                 else:
-                    start = offset
+                    start = min(offset, filtered_total)
                 end = min(start + n_lines, filtered_total)
                 logs_to_return = filtered_indexed_logs[start:end]
                 real_offset = start
         else:
+            # 无过滤条件 — _read_chained_log_lines 已做好了偏移读取
             filtered_total = total_lines
             logs_to_return = filtered_indexed_logs
             if offset < 0:
@@ -2429,15 +2433,20 @@ async def get_logs(
                     "line": line_number,
                 })
         
+        # 计算所有日志文件链的总大小
+        log_size = sum(f.stat().st_size for f in chain if f.exists())
+
         return {
             "service": service,
             "logs": entries,
-            "total": total_lines,
+            "total": filtered_total,
+            "total_all": total_lines,
             "displayed": len(entries),
             "searched": filtered_total if search else total_lines,
             "offset": real_offset,
             "has_more_prev": real_offset > 0,
-            "has_more_next": real_offset + len(entries) < filtered_total
+            "has_more_next": real_offset + len(entries) < filtered_total,
+            "log_size": log_size
         }
     except Exception as e:
         logger.error(f"Failed to get logs: {e}")
@@ -2546,6 +2555,65 @@ async def metrics_sse(request: Request, service: str = Query("platform"), token:
             await asyncio.sleep(METRICS_INTERVAL_SECONDS)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.get("/api/logs/search-matches")
+async def search_log_matches(
+    service: str = Query("platform"),
+    search: str = Query(...),
+    level: Optional[str] = Query(None),
+    range: Optional[str] = Query(None, alias="range"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict:
+    """Return only matching line numbers for a search query (lightweight).
+    
+    Returns { matches: [lineNo1, lineNo2, ...], total_matches: N, total_lines: M }
+    where lineNo is 1-based.
+    """
+    _range_seconds = {"1h": 3600, "6h": 6*3600, "24h": 24*3600, "7d": 7*24*3600, "30d": 30*24*3600}
+    time_cutoff = None
+    if range and range != "all" and range in _range_seconds:
+        time_cutoff = datetime.now() - timedelta(seconds=_range_seconds[range])
+    try:
+        chain = _get_log_chain(service)
+        if not chain:
+            return {"matches": [], "total_matches": 0, "total_lines": 0}
+        
+        lowered = search.lower()
+        level_upper = level.upper() if level else None
+        matches = []
+        global_idx = 0
+        for fpath in chain:
+            try:
+                with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                    for line in f:
+                        global_idx += 1
+                        # Level filter
+                        if level_upper and extract_log_level(line) != level_upper:
+                            continue
+                        # Time range filter
+                        if time_cutoff:
+                            ts_str = line[:19]
+                            try:
+                                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                                if ts < time_cutoff:
+                                    continue
+                            except Exception:
+                                pass
+                        # Search match
+                        if lowered in line.lower():
+                            matches.append(global_idx)  # 1-based line number
+            except Exception:
+                pass
+        
+        return {
+            "matches": matches,
+            "total_matches": len(matches),
+            "total_lines": global_idx
+        }
+    except Exception as e:
+        logger.error(f"Search matches error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/logs/download")

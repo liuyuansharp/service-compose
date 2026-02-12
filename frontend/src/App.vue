@@ -1425,10 +1425,12 @@
             <div
               v-for="(log, idx) in filteredDisplayedLogs"
               :key="log._fIdx"
+              :data-line="log.line"
               class="flex hover:bg-white/5 rounded-sm transition-colors"
               :class="[
                 getLogColor(log.level),
-                isCurrentMatchLine(log, idx) ? 'bg-yellow-500/15 ring-1 ring-yellow-500/40' : ''
+                isCurrentMatchLine(log, idx) ? 'bg-yellow-500/15 ring-1 ring-yellow-500/40' : '',
+                highlightedLogLine && log.line === highlightedLogLine ? 'log-line-highlight' : ''
               ]"
             >
               <!-- Line number -->
@@ -1476,6 +1478,9 @@
           <!-- History: total lines from backend -->
           <span v-if="logMode === 'history' && selectedService && logsMeta[selectedService]" class="tabular-nums">
             {{ t('total_lines', { count: logsMeta[selectedService].total }) }}
+          </span>
+          <span v-if="logMode === 'history' && selectedService && logFileSize[selectedService] != null" class="tabular-nums text-gray-400 dark:text-gray-500">
+            ({{ formatFileSize(logFileSize[selectedService]) }})
           </span>
           <!-- Live: buffer size -->
           <span v-if="logMode === 'live'" class="tabular-nums">
@@ -2409,6 +2414,22 @@ const onLogLevelClick = async (level) => {
   currentMatchIndex.value[selectedService.value] = -1
   if (logMode.value === 'live') {
     // Live 模式仅前端过滤，computed 自动生效
+    // 如果有搜索词，在新分级下重新匹配
+    if (logSearch.value) {
+      const kw = logSearch.value.toLowerCase()
+      const matches = []
+      filteredDisplayedLogs.value.forEach((log) => {
+        if (log.raw && log.raw.toLowerCase().includes(kw) && log.line != null) {
+          matches.push(log.line)
+        }
+      })
+      searchMatches.value[selectedService.value] = matches
+      currentMatchIndex.value[selectedService.value] = matches.length > 0 ? 0 : -1
+      if (matches.length > 0) {
+        await nextTick()
+        scrollToSearchMatch(selectedService.value, 0)
+      }
+    }
     return
   }
   // History 模式：向后端请求
@@ -2416,6 +2437,30 @@ const onLogLevelClick = async (level) => {
     await fetchLogsByLevel(level)
   } else {
     await loadLogs(selectedService.value)
+  }
+  // 如果有搜索词，在新分级下重新搜索
+  if (logSearch.value) {
+    const service = selectedService.value
+    const keyword = logSearch.value
+    try {
+      const params = new URLSearchParams({ service, search: keyword })
+      if (level && level !== 'ALL') {
+        params.set('level', level)
+      }
+      const rangeQ = toRangeQuery()
+      const response = await authorizedFetch(`/api/logs/search-matches?${params.toString()}${rangeQ}`)
+      if (response.ok && logSearch.value === keyword) {
+        const data = await response.json()
+        const matches = (data.matches || []).map(n => n - 1)
+        searchMatches.value[service] = matches
+        currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
+        if (matches.length > 0) {
+          await scrollToSearchMatch(service, 0)
+        }
+      }
+    } catch (e) {
+      console.error('Re-search after level change error:', e)
+    }
   }
 }
 
@@ -2432,8 +2477,8 @@ const isCurrentMatchLine = (log, idx) => {
   const matchIdx = currentMatchIndex.value[svc]
   if (!matches?.length || matchIdx == null || matchIdx < 0) return false
   if (logMode.value === 'live') {
-    // Live 模式：matches 存储的是 filteredDisplayedLogs 中的索引
-    return matches[matchIdx] === idx
+    // Live 模式：matches 存储的是 1-based line 号
+    return matches[matchIdx] === log.line
   }
   // History 模式：matches 存储的是全局行号（0-based）
   const lineNo = getLogLineNumber(log)
@@ -2503,6 +2548,7 @@ const fetchLogsByLevel = async (level) => {
     // data.logs 为最近200条匹配日志，data.total 为匹配总数
     logs.value[service] = data.logs || []
     logsMeta.value[service] = { total: data.total || (data.logs||[]).length, offset: data.offset ?? 0 }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset ?? 0
     logHasMorePrev.value[service] = data.has_more_prev ?? false
     logHasMoreNext.value[service] = data.has_more_next ?? false
@@ -3768,6 +3814,7 @@ let statusUptimeInterval = null
 const logs = ref({}) // { service: [log, ...] }
 const logsLoading = ref({}) // { service: true/false }
 const logsMeta = ref({}) // { service: { total, offset, ... } }
+const logFileSize = ref({}) // { service: bytes } 日志文件总大小
 const logOffset = ref({}) // { service: 当前起始行号 }
 const logHasMorePrev = ref({}) // { service: 是否还有上一页 }
 const logHasMoreNext = ref({}) // { service: 是否还有下一页 }
@@ -3778,6 +3825,8 @@ const searchMatches = ref({}) // { service: [globalIndex1, globalIndex2, ...] }
 const currentMatchIndex = ref({}) // { service: 当前匹配在 searchMatches 数组中的下标 }
 const logPaused = ref(false)
 const followLogs = ref(true) // 当为 true 时，自动滚动到末尾（Live 模式）
+const highlightedLogLine = ref(null) // 跳转高亮的行号（line 字段值），用于闪烁提醒
+let highlightedLogLineTimer = null
 const logSearch = ref('')
 const logLevelFilter = ref('ALL')
 // 新增：保留实时日志的最大行数，防止内存飙升
@@ -3790,6 +3839,15 @@ const logTimeRangeOptions = [
   { value: '24h', label: computed(() => t('range_24h')) },
   { value: 'all', label: computed(() => t('range_all')) },
 ]
+
+// 辅助：格式化文件大小
+const formatFileSize = (bytes) => {
+  if (bytes == null || bytes < 0) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
+}
 
 // 辅助：HTML 转义与高亮匹配
 const escapeHtml = (str) => {
@@ -3821,6 +3879,7 @@ const setLogMode = (mode) => {
   if (!svc) return
   // 重置通用状态
   logLevelFilter.value = 'ALL'
+  _logSearchSuppressWatch = true
   logSearch.value = ''
   searchMatches.value[svc] = []
   currentMatchIndex.value[svc] = -1
@@ -5146,80 +5205,102 @@ const totalLogs = computed(() => {
   return logs.value[selectedService.value]?.length || 0
 })
 
-// 日志搜索防抖与并发保护（单次API请求，lines=all）
+// 日志搜索防抖与并发保护
 let logSearchDebounceTimer = null
 let logSearchInProgress = false
+// 内部标记：当由 setLogMode/loadLogs 代码清除 logSearch 时，跳过 watch 的恢复加载
+let _logSearchSuppressWatch = false
 watch(logSearch, (keyword) => {
   if (logSearchDebounceTimer) clearTimeout(logSearchDebounceTimer)
+  // 清除搜索时立即执行，不走 debounce
+  if (!keyword) {
+    logSearchInProgress = false
+    const service = selectedService.value
+    if (!service) return
+    searchMatches.value[service] = []
+    currentMatchIndex.value[service] = -1
+    // 如果是内部代码清除的，不需要 watch 重复加载
+    if (_logSearchSuppressWatch) {
+      _logSearchSuppressWatch = false
+      return
+    }
+    if (logMode.value === 'history') {
+      // 重新加载当前分级的最新日志页
+      const lvl = logLevelFilter.value
+      if (lvl && lvl !== 'ALL') {
+        fetchLogsByLevel(lvl)
+      } else {
+        logsLoading.value[service] = true
+        authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${toRangeQuery()}`)
+          .then(async response => {
+            if (response.ok) {
+              const data = await response.json()
+              logs.value[service] = data.logs
+              logsMeta.value[service] = { total: data.total, offset: data.offset }
+              if (data.log_size != null) logFileSize.value[service] = data.log_size
+              logOffset.value[service] = data.offset
+              logHasMorePrev.value[service] = data.has_more_prev
+              logHasMoreNext.value[service] = data.has_more_next
+              await nextTick()
+              scrollLogsToBottom()
+            }
+          })
+          .catch(() => {})
+          .finally(() => { logsLoading.value[service] = false })
+      }
+    } else {
+      // Live 模式：清除搜索后恢复自动跟随
+      followLogs.value = true
+      nextTick(() => scrollLogsToBottom())
+    }
+    return
+  }
   logSearchDebounceTimer = setTimeout(async () => {
     const service = selectedService.value
     if (!service) return
-    // 分模式处理搜索：历史模式走后端全量搜索，实时模式在本地流内搜索
     if (logMode.value === 'history') {
+      // 历史模式走后端搜索行号
       if (logSearchInProgress) return
       logSearchInProgress = true
-      logsLoading.value[service] = true
       try {
-        if (!keyword) {
-          searchMatches.value[service] = []
-          currentMatchIndex.value[service] = -1
-          logsLoading.value[service] = false
-          logSearchInProgress = false
-          return
-        }
-        // 单次API请求，lines=all，带分级参数
-        const params = new URLSearchParams({ service, lines: 'all', offset: '0', search: keyword })
-        if (["ERROR", "WARNING", "DEBUG"].includes(logLevelFilter.value)) {
+        const params = new URLSearchParams({ service, search: keyword })
+        if (logLevelFilter.value && logLevelFilter.value !== 'ALL') {
           params.set('level', logLevelFilter.value)
         }
-        const response = await authorizedFetch(`/api/logs?${params.toString()}`)
+        const rangeQ = toRangeQuery()
+        const response = await authorizedFetch(`/api/logs/search-matches?${params.toString()}${rangeQ}`)
         if (!response.ok) throw new Error('Failed to search logs')
+        // 检查搜索词是否仍然匹配（用户可能已更改输入）
+        if (logSearch.value !== keyword) return
         const data = await response.json()
-        logs.value[service] = data.logs
-        logsMeta.value[service] = { total: data.total, offset: data.offset, searched: data.searched }
-        // 记录所有匹配行号
-        const matches = []
-        data.logs.forEach((log) => {
-          if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-            if (typeof log.line === 'number') {
-              matches.push(log.line - 1)
-            }
-          }
-        })
+        // matches 是 1-based 行号数组，转为 0-based 存储
+        const matches = (data.matches || []).map(n => n - 1)
         searchMatches.value[service] = matches
         currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
-        await nextTick()
-        scrollLogsToTop()
+        if (matches.length > 0) {
+          await scrollToSearchMatch(service, 0)
+        }
       } catch (e) {
         console.error('Search logs error:', e)
         showNotification(t('search_failed'), 'error')
       } finally {
-        logsLoading.value[service] = false
         logSearchInProgress = false
       }
     } else {
-      // 实时模式：本地匹配当前缓冲区内的 logs（不请求后端）
-      if (!keyword) {
-        searchMatches.value[service] = []
-        currentMatchIndex.value[service] = -1
-        return
-      }
+      // 实时模式：本地匹配当前缓冲区，用 line 号作为稳定标识
       const matches = []
+      const kw = keyword.toLowerCase()
       const list = filteredDisplayedLogs.value
-      list.forEach((log, idx) => {
-        if (log.raw && log.raw.toLowerCase().includes(keyword.toLowerCase())) {
-          matches.push(idx)  // 存储在 filteredDisplayedLogs 中的索引
+      list.forEach((log) => {
+        if (log.raw && log.raw.toLowerCase().includes(kw) && log.line != null) {
+          matches.push(log.line)  // 存储 1-based line 号（稳定标识）
         }
       })
       searchMatches.value[service] = matches
       currentMatchIndex.value[service] = matches.length > 0 ? 0 : -1
-      await nextTick()
-      // 滚动到第一个匹配项
-      if (matches.length > 0 && logsContainer.value) {
-        const lineNode = logsContainer.value.children?.[matches[0]]
-        if (lineNode) {
-          try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
-        }
+      if (matches.length > 0) {
+        await nextTick()
+        scrollToSearchMatch(service, 0)
       }
     }
   }, 500)
@@ -5242,6 +5323,7 @@ const goBackToLastPosition = async () => {
     const data = await response.json()
     logs.value[service] = data.logs
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
@@ -5267,6 +5349,27 @@ const rememberCurrentPosition = () => {
   }
 }
 
+// 将目标行滚动到滚动容器视口正中央，并设置高亮闪烁
+const scrollToLineCenter = (targetLine, smooth = true) => {
+  const container = logsContainer.value
+  if (!container) return
+  const lineNode = container.querySelector(`[data-line="${targetLine}"]`)
+  if (lineNode) {
+    // 使用 getBoundingClientRect 计算精确的相对偏移，不依赖 offsetParent 链
+    const containerRect = container.getBoundingClientRect()
+    const lineRect = lineNode.getBoundingClientRect()
+    // lineRect.top - containerRect.top = 元素顶部相对容器可视区顶部的距离
+    // 加上 container.scrollTop 得到元素在滚动内容中的绝对位置
+    const lineTopInScroll = lineRect.top - containerRect.top + container.scrollTop
+    const targetScroll = lineTopInScroll - (container.clientHeight / 2) + (lineNode.offsetHeight / 2)
+    container.scrollTo({ top: Math.max(targetScroll, 0), behavior: smooth ? 'smooth' : 'auto' })
+  }
+  // 设置高亮
+  if (highlightedLogLineTimer) clearTimeout(highlightedLogLineTimer)
+  highlightedLogLine.value = targetLine
+  highlightedLogLineTimer = setTimeout(() => { highlightedLogLine.value = null }, 2500)
+}
+
 // 基于全局行号跳转到匹配位置
 const jumpToLogLine = async (globalIndex) => {
   const service = selectedService.value
@@ -5274,6 +5377,7 @@ const jumpToLogLine = async (globalIndex) => {
   // 在历史模式，切换回全部视图并清除搜索
   if (logMode.value === 'history') {
     logLevelFilter.value = 'ALL'
+    _logSearchSuppressWatch = true
     logSearch.value = ''
   }
   // 计算该行所在页的 offset
@@ -5286,29 +5390,22 @@ const jumpToLogLine = async (globalIndex) => {
     const data = await response.json()
     logs.value[service] = data.logs
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
-    await nextTick()
-    // 计算该行在当前页中的相对 index，并滚动到该行附近
-    // globalIndex 是 0-based 原始行索引，data.logs 中带有原始行号 line
-    let localIndex = globalIndex - data.offset
+    // 先关闭 loading 状态，让 v-if 分支切换到日志行渲染
+    logsLoading.value[service] = false
+    // 计算目标行号（1-based line number）
+    let targetLine = globalIndex + 1
     if (Array.isArray(data.logs)) {
-      const foundIdx = data.logs.findIndex(l => typeof l.line === 'number' && (l.line - 1) === globalIndex)
-      if (foundIdx >= 0) {
-        localIndex = foundIdx
-      }
+      const found = data.logs.find(l => typeof l.line === 'number' && (l.line - 1) === globalIndex)
+      if (found) targetLine = found.line
     }
-    if (logsContainer.value) {
-      const container = logsContainer.value
-      const lineNode = container.children?.[localIndex]
-      if (lineNode) {
-        try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) { const centerOffset = lineNode.offsetTop - (container.clientHeight / 2) + (lineNode.clientHeight / 2); container.scrollTop = Math.max(centerOffset, 0) }
-      } else {
-        const lineHeight = 18 // 估算每行高度（px）
-        try { container.scrollTo({ top: Math.max(0, localIndex * lineHeight - (container.clientHeight / 2)), behavior: 'smooth' }) } catch (e) { container.scrollTop = Math.max(0, localIndex * lineHeight - (container.clientHeight / 2)) }
-      }
-    }
+    // 等待 Vue DOM 更新 + 浏览器布局完成后再滚动
+    await nextTick()
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    scrollToLineCenter(targetLine)
   } catch (e) {
     console.error('Jump to log line error:', e)
     showNotification(t('jump_failed'), 'error')
@@ -5325,12 +5422,7 @@ const jumpToNextMatch = () => {
   const current = currentMatchIndex.value[service] ?? -1
   const nextIndex = current < matches.length - 1 ? current + 1 : 0
   currentMatchIndex.value[service] = nextIndex
-  if (logMode.value === 'live') {
-    // Live 模式：matches 存储的是 filteredDisplayedLogs 内的索引，直接滚动
-    scrollToLocalMatch(matches[nextIndex])
-  } else {
-    jumpToLogLine(matches[nextIndex])
-  }
+  scrollToSearchMatch(service, nextIndex)
 }
 
 const jumpToPrevMatch = () => {
@@ -5341,19 +5433,56 @@ const jumpToPrevMatch = () => {
   const current = currentMatchIndex.value[service] ?? 0
   const prevIndex = current > 0 ? current - 1 : matches.length - 1
   currentMatchIndex.value[service] = prevIndex
-  if (logMode.value === 'live') {
-    scrollToLocalMatch(matches[prevIndex])
-  } else {
-    jumpToLogLine(matches[prevIndex])
-  }
+  scrollToSearchMatch(service, prevIndex)
 }
 
-// Live 模式本地滚动到匹配行
-const scrollToLocalMatch = (localIdx) => {
-  if (!logsContainer.value) return
-  const lineNode = logsContainer.value.children?.[localIdx]
-  if (lineNode) {
-    try { lineNode.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
+// 统一搜索匹配跳转：在当前已加载的日志内精确定位，不重新请求后端
+const scrollToSearchMatch = async (service, matchArrIdx) => {
+  const matches = searchMatches.value[service]
+  if (!matches?.length || matchArrIdx < 0 || matchArrIdx >= matches.length) return
+  const matchValue = matches[matchArrIdx]
+  if (logMode.value === 'live') {
+    // Live 模式：matchValue = 1-based line 号，直接定位
+    await nextTick()
+    scrollToLineCenter(matchValue)
+  } else {
+    // History 模式：matchValue = 全局行号(0-based)，targetLine = 1-based
+    const targetLine = matchValue + 1
+    // 检查目标行是否在当前已加载的日志中
+    const currentLogs = logs.value[service] || []
+    const found = currentLogs.find(l => l.line === targetLine)
+    if (found) {
+      // 数据已在视图中，直接滚动 + 高亮
+      await nextTick()
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      scrollToLineCenter(targetLine)
+    } else {
+      // 数据不在视图中，加载包含目标行的原始页面
+      const pageSize = 200
+      const pageOffset = Math.max(0, matchValue - Math.floor(pageSize / 2))
+      logsLoading.value[service] = true
+      try {
+        const params = new URLSearchParams({ service, lines: String(pageSize), offset: String(pageOffset) })
+        const rangeQ = toRangeQuery()
+        const response = await authorizedFetch(`/api/logs?${params.toString()}${rangeQ}`)
+        if (!response.ok) throw new Error('Failed to fetch logs')
+        const data = await response.json()
+        logs.value[service] = data.logs
+        logsMeta.value[service] = { total: data.total, offset: data.offset }
+        if (data.log_size != null) logFileSize.value[service] = data.log_size
+        logOffset.value[service] = data.offset
+        logHasMorePrev.value[service] = data.has_more_prev
+        logHasMoreNext.value[service] = data.has_more_next
+        logsLoading.value[service] = false
+        await nextTick()
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        scrollToLineCenter(targetLine)
+      } catch (e) {
+        console.error('Search match jump error:', e)
+      } finally {
+        logsLoading.value[service] = false
+      }
+    }
   }
 }
 
@@ -5395,6 +5524,7 @@ const refreshStatus = async () => {
 const loadLogs = async (service) => {
   selectedService.value = service
   // 状态（logPaused / followLogs）由 setLogMode 统一管理，此处仅负责数据加载
+  _logSearchSuppressWatch = true
   logSearch.value = ''
   logsLoading.value[service] = true
   logs.value[service] = []
@@ -5425,6 +5555,7 @@ const loadLogs = async (service) => {
     const data = await response.json()
     logs.value[service] = data.logs
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
@@ -5464,7 +5595,9 @@ const fetchMoreLogs = async (direction = 'prev') => {
     return
   }
   try {
-    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${fetchOffset}${toRangeQuery()}`)
+    // 保持当前级别过滤条件，确保加载更多时仅拉取同一级别的日志
+    const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
+    const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${fetchOffset}${lvl}${toRangeQuery()}`)
     if (!response.ok) throw new Error('Failed to fetch logs')
     const data = await response.json()
     if (direction === 'prev') {
@@ -5474,6 +5607,7 @@ const fetchMoreLogs = async (direction = 'prev') => {
       logs.value[service] = currentLogs.concat(data.logs)
     }
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
     await nextTick()
@@ -5590,6 +5724,7 @@ const clearLogs = () => {
           if (resp.ok) {
             const data = await resp.json()
             logsMeta.value[service] = { total: data.total, offset: data.offset }
+            if (data.log_size != null) logFileSize.value[service] = data.log_size
           }
         } catch (e) {}
       })()
@@ -5638,6 +5773,7 @@ const goToBottom = async (options = {}) => {
     const data = await response.json()
     logs.value[service] = data.logs
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
@@ -5673,6 +5809,7 @@ const goToTop = async () => {
     const data = await response.json()
     logs.value[service] = data.logs
     logsMeta.value[service] = { total: data.total, offset: data.offset }
+    if (data.log_size != null) logFileSize.value[service] = data.log_size
     logOffset.value[service] = data.offset
     logHasMorePrev.value[service] = data.has_more_prev
     logHasMoreNext.value[service] = data.has_more_next
@@ -5812,6 +5949,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 行号跳转高亮闪烁 */
+@keyframes log-line-flash {
+  0% { background-color: rgba(6, 182, 212, 0.35); }
+  25% { background-color: transparent; }
+  50% { background-color: rgba(6, 182, 212, 0.25); }
+  75% { background-color: transparent; }
+  100% { background-color: rgba(6, 182, 212, 0.15); }
+}
+.log-line-highlight {
+  animation: log-line-flash 1.5s ease-out;
+  background-color: rgba(6, 182, 212, 0.15);
+  border-left: 2px solid rgba(6, 182, 212, 0.7);
+}
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);
