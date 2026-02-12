@@ -2,7 +2,7 @@
   "services": [
     {
       "name": "service_platform",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_platform",
         "1000"
@@ -15,7 +15,7 @@
     },
     {
       "name": "service_A",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_A",
         "1000"
@@ -35,7 +35,7 @@
     },
     {
       "name": "service_B",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_B",
         "1000"
@@ -50,7 +50,7 @@
     },
     {
       "name": "service_C",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_C",
         "1000"
@@ -65,7 +65,7 @@
     },
     {
       "name": "service_D",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_D",
         "1000"
@@ -85,7 +85,7 @@
     },
     {
       "name": "service_E",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_E",
         "1000"
@@ -100,7 +100,7 @@
     },
     {
       "name": "service_F",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_F",
         "1000"
@@ -115,7 +115,7 @@
     },
     {
       "name": "service_G",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_G",
         "1000"
@@ -130,7 +130,7 @@
     },
     {
       "name": "service_H",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_H",
         "1000"
@@ -145,7 +145,7 @@
     },
     {
       "name": "service_I",
-      "cmd": "./examples/dummy_service.sh",
+      "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
         "service_I",
         "1000"
@@ -159,5 +159,5 @@
       ]
     }
   ],
-  "run_dir": "./examples/.services"
+  "run_dir": "/home/liuyuan/workspace/work/fsys/service/examples/.services"
 }

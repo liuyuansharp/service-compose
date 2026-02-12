@@ -4,5 +4,5 @@ set -euo pipefail
 
 source venv/bin/activate
 
-nohup python3 manage_services.py start --config examples/services_config.json --daemon &
-nohup python3 -m backend.app --config examples/services_config.json --host 0.0.0.0 --port 8080 &
+nohup python3 manage_services.py start --config /home/liuyuan/workspace/work/fsys/service/examples/services_config.json --daemon &
+nohup python3 -m backend.app --config /home/liuyuan/workspace/work/fsys/service/examples/services_config.json --host 0.0.0.0 --port 8080 &

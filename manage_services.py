@@ -584,6 +584,11 @@ def main():
         elif args.action == 'restart':
             mgr.restart_all()
     except Exception as e:
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        for frame in tb:
+            print(f'ERROR: {e} FILENAME: {frame.filename} LINENO: {frame.lineno} FUNCTIONNAME: {frame.name} ')
+
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

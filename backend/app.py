@@ -417,8 +417,7 @@ async def _get_service_lock(service_name: str) -> asyncio.Lock:
 
 async def _run_service_command(action: str, service: Optional[str], timeout: float = 30) -> dict:
     cmd = [
-        sys.executable,
-        str(RUN_DIR / 'manage_services.py'),
+        f"{RUN_DIR}/manage_services",
         action,
         f"--config",
         f"{CONFIG_FILE}"
@@ -501,7 +500,13 @@ async def control_service(control: ServiceControl, current_user: dict = Depends(
             append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail="error")
             raise
         except Exception as e:
+            import traceback
+            tb = traceback.extract_tb(e.__traceback__)
+            for frame in tb:
+                print(f'ERROR: {e} FILENAME: {frame.filename} LINENO: {frame.lineno} FUNCTIONNAME: {frame.name} ')
+                logger.error(f'ERROR: {e} FILENAME: {frame.filename} LINENO: {frame.lineno} FUNCTIONNAME: {frame.name} ')
             logger.error(f"Control error: {e}")
+            
             append_audit_log(user=current_user["username"], role=current_user.get("role", "admin"), action=control.action, target=control.service or "all", result="failed", detail=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 

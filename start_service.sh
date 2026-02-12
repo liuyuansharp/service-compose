@@ -56,7 +56,7 @@ echo ""
 read -p "Ready to start? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    python3 manage_services.py start --config examples/services_config.json --daemon
+    python3 manage_services.py start --config /home/liuyuan/workspace/work/fsys/service/examples/services_config.json --daemon
 else
     echo "Cancelled."
 fi

@@ -69,7 +69,7 @@ def _should_restart_now(sr: Dict, now: datetime) -> bool:
 
 
 def _do_scheduled_restart(service_name: str):
-    cmd = [sys.executable, str(RUN_DIR / 'manage_services.py'), 'restart', "--config", f"{CONFIG_FILE}"
+    cmd = [f"{RUN_DIR}/manage_services", 'restart', "--config", f"{CONFIG_FILE}"
            '--service', service_name, '--daemon']
     try:
         subprocess.Popen(cmd, cwd=str(RUN_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
