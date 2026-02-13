@@ -55,7 +55,7 @@
         <span class="sbar-divider"></span>
 
         <!-- CPU hot cores -->
-        <span class="inline-flex items-center gap-1 flex-shrink-0" :title="t('statusbar_cpu_hot')">
+        <span class="inline-flex items-center gap-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" :title="t('statusbar_cpu_hot')" @click="onOpenCpuCores && onOpenCpuCores()">
           <svg viewBox="0 0 24 24" class="h-3 w-3 flex-shrink-0" :class="cpuHotColor" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <rect x="9" y="9" width="6" height="6" />
@@ -81,7 +81,7 @@
         <span class="sbar-divider"></span>
 
         <!-- Disk usage -->
-        <span class="inline-flex items-center gap-1 flex-shrink-0" :title="t('statusbar_disk')">
+        <span class="inline-flex items-center gap-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" :title="t('statusbar_disk')" @click="onOpenDiskDetails && onOpenDiskDetails()">
           <svg viewBox="0 0 24 24" class="h-3 w-3 flex-shrink-0" :class="diskColor" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
             <line x1="6" y1="16" x2="6.01" y2="16" /><line x1="10" y1="16" x2="10.01" y2="16" />
@@ -147,6 +147,8 @@ const props = defineProps({
   isConnected: { type: Boolean, default: false },
   lastUpdated: { type: String, default: '' },
   metrics: { type: Object, default: () => ({}) },
+  onOpenCpuCores: { type: Function, default: null },
+  onOpenDiskDetails: { type: Function, default: null },
   onOpenSystemInfo: { type: Function, required: true },
   onOpenTerminal: { type: Function, required: true },
   refreshStatus: { type: Function, required: true },

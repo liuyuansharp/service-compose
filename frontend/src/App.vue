@@ -317,6 +317,8 @@
       :is-connected="isConnected"
       :last-updated="lastUpdated"
       :metrics="systemMetrics"
+      :on-open-cpu-cores="openCpuCores"
+      :on-open-disk-details="openDiskDetails"
       :on-open-system-info="() => { showSystemInfo = true }"
       :on-open-terminal="() => { showTerminal = true }"
       :refresh-status="refreshStatus"
