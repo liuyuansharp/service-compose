@@ -27,6 +27,7 @@
           v-if="!isPopoutMode"
           :is-admin="isAdmin"
           :is-connected="isConnected"
+          :is-dark="isDark"
           :current-user="currentUser"
           :user-role="userRole"
           :lang-label="langLabel"
