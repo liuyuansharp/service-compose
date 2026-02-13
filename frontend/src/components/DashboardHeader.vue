@@ -5,9 +5,9 @@
         <div class="flex-shrink-0">
           <h1 class="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-slate-100 inline-flex items-center gap-2 sm:gap-3">
             {{ t('dashboard_title') }}
-            <span class="tech-live-chip">
-              <span class="tech-live-dot"></span>
-              <span>{{ t('live_label') }}</span>
+            <span class="tech-live-chip" :class="isConnected ? '' : 'tech-live-chip--offline'">
+              <span class="tech-live-dot" :class="isConnected ? '' : 'tech-live-dot--offline'"></span>
+              <span>{{ isConnected ? t('live_label') : t('offline_label') }}</span>
             </span>
           </h1>
           <p class="text-xs sm:text-sm text-gray-600 dark:text-slate-400 mt-1">{{ t('dashboard_subtitle') }}</p>
@@ -115,6 +115,7 @@
 <script setup>
 defineProps({
   isAdmin: { type: Boolean, required: true },
+  isConnected: { type: Boolean, default: false },
   currentUser: { type: [Object, null], default: null },
   userRole: { type: String, required: true },
   langLabel: { type: String, required: true },

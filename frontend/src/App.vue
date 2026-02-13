@@ -26,6 +26,7 @@
         <DashboardHeader
           v-if="!isPopoutMode"
           :is-admin="isAdmin"
+          :is-connected="isConnected"
           :current-user="currentUser"
           :user-role="userRole"
           :lang-label="langLabel"
@@ -475,6 +476,7 @@ const {
   lastUpdated,
   statusFetchedAt,
   statusTicker,
+  isConnected,
   refreshStatus,
   startDashboardSSE,
   startUptimeTicker,

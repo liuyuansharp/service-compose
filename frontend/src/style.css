@@ -433,6 +433,23 @@ button:active {
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* Offline variants */
+.tech-live-chip--offline {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: rgba(239, 68, 68, 0.85);
+  background: rgba(239, 68, 68, 0.08);
+}
+.dark .tech-live-chip--offline {
+  border-color: rgba(248, 113, 113, 0.4);
+  color: rgba(252, 165, 165, 0.9);
+  background: rgba(239, 68, 68, 0.15);
+}
+.tech-live-dot--offline {
+  background: rgba(239, 68, 68, 0.85);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+  animation: none;
+}
+
 .tech-shell {
   position: relative;
   z-index: 1;

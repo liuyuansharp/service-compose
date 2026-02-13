@@ -17,6 +17,7 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
   const lastUpdated = ref('')
   const statusFetchedAt = ref(0)
   const statusTicker = ref(0)
+  const isConnected = ref(false)
   let statusInterval = null
   let dashboardEventSource = null
   let statusUptimeInterval = null
@@ -31,6 +32,7 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
       lastUpdated.value = data.timestamp
       statusFetchedAt.value = Date.now()
       statusTicker.value = Date.now()
+      isConnected.value = true
     } catch (error) {
       if (error.message === 'Unauthorized') return
       console.error('Error refreshing status:', error)
@@ -42,8 +44,10 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
         lastUpdated.value = data.timestamp
         statusFetchedAt.value = Date.now()
         statusTicker.value = Date.now()
+        isConnected.value = true
       } catch (fallbackError) {
         if (fallbackError.message === 'Unauthorized') return
+        isConnected.value = false
         showNotification?.(t?.('refresh_failed') || 'Refresh failed', 'error')
       }
     }
@@ -61,11 +65,13 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
         lastUpdated.value = data.timestamp
         statusFetchedAt.value = Date.now()
         statusTicker.value = Date.now()
+        isConnected.value = true
       } catch (e) {}
     }
     dashboardEventSource.onerror = () => {
       dashboardEventSource.close()
       dashboardEventSource = null
+      isConnected.value = false
       if (!dashboardEventSource && !statusInterval) {
         statusInterval = setInterval(refreshStatus, 5000)
       }
@@ -99,6 +105,7 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
     lastUpdated,
     statusFetchedAt,
     statusTicker,
+    isConnected,
     refreshStatus,
     startDashboardSSE,
     startUptimeTicker,
