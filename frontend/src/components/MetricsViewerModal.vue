@@ -58,7 +58,7 @@
                   <span class="inline-block w-3 h-3 rounded-full bg-blue-600"></span>CPU
                 </span>
               </div>
-              <div :ref="(el) => { if (cpuChartRef) cpuChartRef.value = el }" class="w-full h-40"></div>
+              <div id="metrics-cpu-chart" class="w-full h-40"></div>
             </div>
 
             <div class="tech-card rounded-md p-4">
@@ -73,7 +73,7 @@
                   <span class="inline-block w-3 h-3 rounded-full bg-purple-600"></span>{{ t('memory') }}
                 </span>
               </div>
-              <div :ref="(el) => { if (memoryChartRef) memoryChartRef.value = el }" class="w-full h-40"></div>
+              <div id="metrics-memory-chart" class="w-full h-40"></div>
             </div>
 
             <div class="tech-card rounded-md p-4">
@@ -92,7 +92,7 @@
                   <span class="inline-block w-3 h-3 rounded-full bg-emerald-500"></span>{{ t('write') }}
                 </span>
               </div>
-              <div :ref="(el) => { if (diskChartRef) diskChartRef.value = el }" class="w-full h-40"></div>
+              <div id="metrics-disk-chart" class="w-full h-40"></div>
             </div>
           </div>
         </div>
@@ -110,9 +110,6 @@ defineProps({
   getMetricsPoints: { type: Function, required: true },
   refreshMetricsHistory: { type: Function, required: true },
   closeMetrics: { type: Function, required: true },
-  cpuChartRef: { type: Object, default: null },
-  memoryChartRef: { type: Object, default: null },
-  diskChartRef: { type: Object, default: null },
   t: { type: Function, required: true },
 })
 </script>

@@ -5,7 +5,6 @@ export function useLogs({
   buildWsUrl,
   t,
   showNotification,
-  logsContainer,
   selectedService,
   authToken,
   openConfirmDialog,
@@ -28,6 +27,11 @@ export function useLogs({
   const logLevelFilter = ref('ALL')
   const LIVE_LOG_LIMIT = 5000
   const logTimeRange = ref('all')
+
+  function getLogsContainer() {
+    return document.getElementById('logs-container')
+  }
+
   const logTimeRangeOptions = [
     { value: '1h', label: computed(() => t('range_1h')) },
     { value: '6h', label: computed(() => t('range_6h')) },
@@ -158,7 +162,7 @@ export function useLogs({
   }
 
   const onLogsScroll = () => {
-    const container = logsContainer.value
+    const container = getLogsContainer()
     if (!container) return
     const svc = selectedService.value
     if (!svc) return
@@ -437,8 +441,8 @@ export function useLogs({
       logHasMorePrev.value[service] = data.has_more_prev
       logHasMoreNext.value[service] = data.has_more_next
       await nextTick()
-      if (logsContainer.value) {
-        logsContainer.value.scrollTop = last.scrollTop || 0
+      if (getLogsContainer()) {
+        getLogsContainer().scrollTop = last.scrollTop || 0
       }
     } catch (e) {
       console.error('Go back position error:', e)
@@ -450,15 +454,15 @@ export function useLogs({
 
   const rememberCurrentPosition = () => {
     const service = selectedService.value
-    if (!service || !logsContainer.value) return
+    if (!service || !getLogsContainer()) return
     logLastPosition.value[service] = {
       offset: logOffset.value[service] || 0,
-      scrollTop: logsContainer.value.scrollTop || 0
+      scrollTop: getLogsContainer().scrollTop || 0
     }
   }
 
   const scrollToLineCenter = (targetLine, smooth = true) => {
-    const container = logsContainer.value
+    const container = getLogsContainer()
     if (!container) return
     const lineNode = container.querySelector(`[data-line="${targetLine}"]`)
     if (lineNode) {
@@ -757,8 +761,8 @@ export function useLogs({
     if (logMode.value === 'live') {
       followLogs.value = true
       await nextTick()
-      if (!logsContainer.value) return
-      logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+      if (!getLogsContainer()) return
+      getLogsContainer().scrollTop = getLogsContainer().scrollHeight
       return
     }
     logsLoading.value[service] = true
@@ -790,8 +794,8 @@ export function useLogs({
     if (logMode.value === 'live') {
       followLogs.value = false
       await nextTick()
-      if (!logsContainer.value) return
-      logsContainer.value.scrollTop = 0
+      if (!getLogsContainer()) return
+      getLogsContainer().scrollTop = 0
       return
     }
     logsLoading.value[service] = true
@@ -818,22 +822,22 @@ export function useLogs({
   }
 
   const scrollLogsToBottom = () => {
-    if (logsContainer.value) {
-      logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+    if (getLogsContainer()) {
+      getLogsContainer().scrollTop = getLogsContainer().scrollHeight
       requestAnimationFrame(() => {
-        if (logsContainer.value) {
-          logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+        if (getLogsContainer()) {
+          getLogsContainer().scrollTop = getLogsContainer().scrollHeight
         }
       })
     }
   }
 
   const scrollLogsToTop = () => {
-    if (logsContainer.value) {
-      logsContainer.value.scrollTop = 0
+    if (getLogsContainer()) {
+      getLogsContainer().scrollTop = 0
       requestAnimationFrame(() => {
-        if (logsContainer.value) {
-          logsContainer.value.scrollTop = 0
+        if (getLogsContainer()) {
+          getLogsContainer().scrollTop = 0
         }
       })
     }

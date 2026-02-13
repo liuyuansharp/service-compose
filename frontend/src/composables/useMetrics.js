@@ -16,10 +16,6 @@ export function useMetrics({
   t,
   authToken,
   isDark,
-  cpuChartRef,
-  memoryChartRef,
-  diskChartRef,
-  trendChartRef,
 }) {
   const metricsService = ref(null)
   const metricsHistory = ref({})
@@ -67,17 +63,20 @@ export function useMetrics({
 
   const initMetricsCharts = async () => {
     const echarts = await loadEcharts()
-    if (cpuChartRef.value) {
+    const cpuEl = document.getElementById('metrics-cpu-chart')
+    const memEl = document.getElementById('metrics-memory-chart')
+    const diskEl = document.getElementById('metrics-disk-chart')
+    if (cpuEl) {
       if (cpuChart) cpuChart.dispose()
-      cpuChart = echarts.init(cpuChartRef.value)
+      cpuChart = echarts.init(cpuEl)
     }
-    if (memoryChartRef.value) {
+    if (memEl) {
       if (memoryChart) memoryChart.dispose()
-      memoryChart = echarts.init(memoryChartRef.value)
+      memoryChart = echarts.init(memEl)
     }
-    if (diskChartRef.value) {
+    if (diskEl) {
       if (diskChart) diskChart.dispose()
-      diskChart = echarts.init(diskChartRef.value)
+      diskChart = echarts.init(diskEl)
     }
 
     metricsResizeHandler = () => {
@@ -90,14 +89,17 @@ export function useMetrics({
 
   const ensureMetricsCharts = async () => {
     const echarts = await loadEcharts()
-    if (!cpuChart && cpuChartRef.value) {
-      cpuChart = echarts.init(cpuChartRef.value)
+    const cpuEl = document.getElementById('metrics-cpu-chart')
+    const memEl = document.getElementById('metrics-memory-chart')
+    const diskEl = document.getElementById('metrics-disk-chart')
+    if (!cpuChart && cpuEl) {
+      cpuChart = echarts.init(cpuEl)
     }
-    if (!memoryChart && memoryChartRef.value) {
-      memoryChart = echarts.init(memoryChartRef.value)
+    if (!memoryChart && memEl) {
+      memoryChart = echarts.init(memEl)
     }
-    if (!diskChart && diskChartRef.value) {
-      diskChart = echarts.init(diskChartRef.value)
+    if (!diskChart && diskEl) {
+      diskChart = echarts.init(diskEl)
     }
   }
 
@@ -291,12 +293,13 @@ export function useMetrics({
   }
 
   const renderTrendChart = async () => {
-    if (!trendChartRef.value || !trendData.value.length) return
+    const trendEl = document.getElementById('trend-chart')
+    if (!trendEl || !trendData.value.length) return
     if (trendChartInstance) {
       trendChartInstance.dispose()
     }
     const echarts = await loadEcharts()
-    trendChartInstance = echarts.init(trendChartRef.value, isDark?.value ? 'dark' : undefined)
+    trendChartInstance = echarts.init(trendEl, isDark?.value ? 'dark' : undefined)
     const isCpu = metricsTrendType.value === 'cpu'
     const times = trendData.value.map(p => {
       const d = new Date(p.t)

@@ -150,7 +150,7 @@
 
       <!-- ═══ Body ═══ -->
       <div
-        :ref="(el) => { if (logsContainerRef) logsContainerRef.value = el }"
+        id="logs-container"
         class="flex-1 overflow-y-auto bg-[#0d1117] font-mono text-xs leading-5"
         style="min-height: 200px"
         @scroll="onLogsScroll"
@@ -244,7 +244,6 @@ defineProps({
   currentMatchIndex: { type: Object, required: true },
   highlightedLogLine: { type: [Number, null], default: null },
   liveLogLimit: { type: Number, required: true },
-  logsContainerRef: { type: Object, default: null },
   setLogMode: { type: Function, required: true },
   closeLogViewer: { type: Function, required: true },
   onLogLevelClick: { type: Function, required: true },

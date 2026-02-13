@@ -166,9 +166,6 @@
       :metrics-loading="metricsLoading"
       v-model:metrics-range-hours="metricsRangeHours"
       :get-metrics-points="getMetricsPoints"
-      :cpu-chart-ref="cpuChartRef"
-      :memory-chart-ref="memoryChartRef"
-      :disk-chart-ref="diskChartRef"
       :refresh-metrics-history="refreshMetricsHistory"
       :close-metrics="closeMetrics"
       :t="t"
@@ -190,7 +187,6 @@
       :current-match-index="currentMatchIndex"
       :highlighted-log-line="highlightedLogLine"
       :live-log-limit="LIVE_LOG_LIMIT"
-      :logs-container-ref="logsContainer"
       :set-log-mode="setLogMode"
       :close-log-viewer="closeLogViewer"
       :on-log-level-click="onLogLevelClick"
@@ -274,7 +270,6 @@
       :trend-range-options="trendRangeOptions"
       :trend-loading="trendLoading"
       :trend-data="trendData"
-      :trend-chart-ref="trendChartRef"
       :t="t"
       :on-close="() => { showMetricsTrend = false }"
       :on-select-range="(value) => { trendRange = value; loadMetricsTrend() }"
@@ -352,12 +347,6 @@ import { useMetrics } from './composables/useMetrics'
 import { useServiceInfo } from './composables/useServiceInfo'
 import { useProcessTree } from './composables/useProcessTree'
 import { useStatusAlerts } from './composables/useStatusAlerts'
-const logsContainer = ref(null)
-const cpuChartRef = ref(null)
-const memoryChartRef = ref(null)
-const diskChartRef = ref(null)
-const trendChartRef = ref(null)
-
 const { buildApiUrl, buildWsUrl, platformLinkUrl } = useApi()
 const { lang, t, langLabel, toggleLanguage } = useI18n()
 const { isDark, themeLabel, toggleTheme } = useTheme(t)
@@ -544,7 +533,6 @@ const {
   buildWsUrl,
   t,
   showNotification,
-  logsContainer,
   selectedService,
   authToken,
   openConfirmDialog,
@@ -586,10 +574,6 @@ const {
   t,
   authToken,
   isDark,
-  cpuChartRef,
-  memoryChartRef,
-  diskChartRef,
-  trendChartRef,
 })
 
 const {

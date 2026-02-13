@@ -54,7 +54,7 @@
         <div v-else-if="trendData.length === 0" class="h-full flex items-center justify-center text-sm text-gray-400">
           {{ t('trend_no_data') }}
         </div>
-        <div v-else :ref="trendChartRef" class="w-full" style="height: min(380px, 50vh);"></div>
+        <div v-else id="trend-chart" class="w-full" style="height: min(380px, 50vh);"></div>
       </div>
       <!-- Footer info -->
       <div class="px-6 py-2 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0">
@@ -72,7 +72,6 @@ defineProps({
   trendRangeOptions: { type: Array, required: true },
   trendLoading: { type: Boolean, required: true },
   trendData: { type: Array, required: true },
-  trendChartRef: { type: [Object, Function, null], default: null },
   t: { type: Function, required: true },
   onClose: { type: Function, required: true },
   onSelectRange: { type: Function, required: true },
