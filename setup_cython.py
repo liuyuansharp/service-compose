@@ -34,6 +34,7 @@ EXCLUDE_FILES = {
 KEEP_AS_SOURCE = {
     '__init__.py',
     'app.py',
+    'auth.py'
 }
 
 

@@ -211,6 +211,11 @@ import py_compile
 py_compile.compile('$SCRIPT_DIR/backend/app.py', cfile='$RELEASE_DIR/backend/app.pyc', doraise=True)
 print('  编译 app.py -> backend/app.pyc')
 "
+    python3 -c "
+import py_compile
+py_compile.compile('$SCRIPT_DIR/backend/auth.py', cfile='$RELEASE_DIR/backend/auth.pyc', doraise=True)
+print('  编译 auth.py -> backend/auth.pyc')
+"
 else
     # 不编译模式：直接拷贝 .py 文件
     cp "$SCRIPT_DIR/manage_services.py" "$RELEASE_DIR/"
