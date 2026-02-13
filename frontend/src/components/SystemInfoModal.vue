@@ -85,12 +85,33 @@
               <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               {{ t('sysinfo_network') }}
             </h4>
-            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              <div v-for="net in info.network" :key="net.interface" class="flex items-baseline gap-2">
-                <dt class="text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap min-w-[5rem] font-mono">{{ net.interface }}</dt>
-                <dd class="text-sm font-mono text-gray-800 dark:text-slate-200">{{ net.ip }}</dd>
+            <div class="space-y-2.5">
+              <div
+                v-for="net in info.network"
+                :key="net.interface"
+                class="rounded-md bg-gray-100/70 dark:bg-slate-900/50 border border-gray-200/60 dark:border-slate-800/60 px-3 py-2.5"
+              >
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-mono font-semibold text-gray-700 dark:text-slate-200">{{ net.interface }}</span>
+                  <span class="text-xs font-mono text-gray-500 dark:text-slate-400">{{ net.ip }}</span>
+                </div>
+                <div class="flex items-center gap-4 text-xs font-mono">
+                  <span class="inline-flex items-center gap-1">
+                    <svg viewBox="0 0 12 12" class="h-3 w-3 text-emerald-500"><path d="M6 2v8M3 7l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="text-gray-500 dark:text-slate-400">{{ t('sysinfo_net_download') }}</span>
+                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ formatSpeed(net.download_speed) }}</span>
+                  </span>
+                  <span class="inline-flex items-center gap-1">
+                    <svg viewBox="0 0 12 12" class="h-3 w-3 text-orange-500"><path d="M6 10V2M3 5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="text-gray-500 dark:text-slate-400">{{ t('sysinfo_net_upload') }}</span>
+                    <span class="font-semibold text-orange-600 dark:text-orange-400">{{ formatSpeed(net.upload_speed) }}</span>
+                  </span>
+                  <span class="text-[10px] text-gray-400 dark:text-slate-500 ml-auto">
+                    {{ t('sysinfo_net_total') }}: ↓{{ net.download_total ?? 0 }} / ↑{{ net.upload_total ?? 0 }} GB
+                  </span>
+                </div>
               </div>
-            </dl>
+            </div>
           </section>
 
           <!-- Runtime Section -->
@@ -149,6 +170,13 @@ watch(() => props.visible, (v) => {
 const formatBootTime = (iso) => {
   if (!iso) return '—'
   try { return new Date(iso).toLocaleString() } catch { return iso }
+}
+
+const formatSpeed = (mbps) => {
+  if (mbps === undefined || mbps === null) return '0 KB/s'
+  if (mbps >= 1024) return `${(mbps / 1024).toFixed(1)} GB/s`
+  if (mbps >= 1) return `${mbps.toFixed(1)} MB/s`
+  return `${(mbps * 1024).toFixed(0)} KB/s`
 }
 
 const osRows = computed(() => [

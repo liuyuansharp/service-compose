@@ -23,6 +23,109 @@ from .models import ServiceStatus, SystemMetrics, DiskPartitionInfo, ServiceInfo
 _system_info_cache = None
 _system_info_cache_time = 0
 
+# ---------- Network IO speed tracking ----------
+import time as _net_time
+
+_net_io_prev: Dict = {}        # {iface: (bytes_sent, bytes_recv, timestamp)}
+_net_io_speed: Dict = {}       # {iface: (upload_MB_s, download_MB_s)}
+
+
+def _refresh_net_io_speed():
+    """Sample net_io_counters to compute per-interface upload/download MB/s."""
+    global _net_io_prev, _net_io_speed
+    try:
+        counters = psutil.net_io_counters(pernic=True)
+    except Exception:
+        return
+    if not counters:
+        return
+    now = _net_time.time()
+    for name, c in counters.items():
+        prev = _net_io_prev.get(name)
+        if prev:
+            dt = now - prev[2]
+            if dt > 0:
+                up = (c.bytes_sent - prev[0]) / dt / (1024 * 1024)
+                down = (c.bytes_recv - prev[1]) / dt / (1024 * 1024)
+                _net_io_speed[name] = (max(round(up, 2), 0), max(round(down, 2), 0))
+        _net_io_prev[name] = (c.bytes_sent, c.bytes_recv, now)
+
+
+def _get_net_io_totals() -> Dict:
+    """Get cumulative network IO totals in GB per interface."""
+    totals: Dict = {}
+    try:
+        counters = psutil.net_io_counters(pernic=True)
+        if counters:
+            for name, c in counters.items():
+                totals[name] = (
+                    round(c.bytes_sent / (1024 ** 3), 2),
+                    round(c.bytes_recv / (1024 ** 3), 2),
+                )
+    except Exception:
+        pass
+    return totals
+
+
+def _is_physical_nic(iface: str) -> bool:
+    """Check if a network interface is a physical NIC (not virtual)."""
+    # lo is always virtual
+    if iface == "lo":
+        return False
+    # Known virtual prefixes
+    _virtual_prefixes = (
+        'veth', 'docker', 'br-', 'virbr', 'vnet', 'tun', 'tap',
+        'flannel', 'cni', 'calico', 'wg', 'tailscale', 'utun',
+        'vmnet', 'vboxnet', 'lxc', 'lxd',
+    )
+    iface_lower = iface.lower()
+    for prefix in _virtual_prefixes:
+        if iface_lower.startswith(prefix):
+            return False
+    # On Linux, physical NICs have /sys/class/net/<iface>/device
+    sys_path = Path(f"/sys/class/net/{iface}/device")
+    if sys_path.exists():
+        return True
+    # Fallback: if /sys not available, accept common physical patterns
+    # (eth*, en*, em*, wl*, ww*, ib*, bond*, br0-9 bridges)
+    import re
+    if re.match(r'^(eth|en|em|wl|ww|ib|bond|br\d)\w*', iface_lower):
+        return True
+    return False
+
+
+def _build_network_info() -> list:
+    """Build network interfaces list with IP and real-time speed."""
+    _refresh_net_io_speed()
+    io_totals = _get_net_io_totals()
+    nets = []
+    try:
+        import socket
+        addrs = psutil.net_if_addrs()
+        for iface, addr_list in addrs.items():
+            if not _is_physical_nic(iface):
+                continue
+            ip = ""
+            for addr in addr_list:
+                if addr.family == socket.AF_INET:
+                    ip = addr.address
+                    break
+            if not ip:
+                continue
+            speed = _net_io_speed.get(iface, (0.0, 0.0))
+            total = io_totals.get(iface, (0.0, 0.0))
+            nets.append({
+                "interface": iface,
+                "ip": ip,
+                "upload_speed": speed[0],    # MB/s
+                "download_speed": speed[1],  # MB/s
+                "upload_total": total[0],    # GB
+                "download_total": total[1],  # GB
+            })
+    except Exception:
+        pass
+    return nets
+
 
 def get_system_info() -> dict:
     """Collect system hardware, OS and runtime info. Cached for 300s."""
@@ -32,7 +135,10 @@ def get_system_info() -> dict:
     global _system_info_cache, _system_info_cache_time
     now = _time.time()
     if _system_info_cache and now - _system_info_cache_time < 300:
-        return _system_info_cache
+        # Static info cached, but network speed always fresh
+        result = dict(_system_info_cache)
+        result["network"] = _build_network_info()
+        return result
 
     info = {}
 
@@ -119,25 +225,13 @@ def get_system_info() -> dict:
     except Exception:
         info["load_avg"] = []
 
-    # ── Network interfaces (primary IPs only) ──
-    try:
-        addrs = psutil.net_if_addrs()
-        nets = []
-        import socket
-        for iface, addr_list in addrs.items():
-            if iface == "lo":
-                continue
-            for addr in addr_list:
-                if addr.family == socket.AF_INET:
-                    nets.append({"interface": iface, "ip": addr.address})
-                    break
-        info["network"] = nets
-    except Exception:
-        info["network"] = []
-
     _system_info_cache = info
     _system_info_cache_time = now
-    return info
+
+    # Network is always fresh (speed data), appended after cache
+    result = dict(info)
+    result["network"] = _build_network_info()
+    return result
 
 
 # ---------- PID ----------
