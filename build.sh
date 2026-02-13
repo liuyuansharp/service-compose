@@ -216,6 +216,11 @@ import py_compile
 py_compile.compile('$SCRIPT_DIR/backend/auth.py', cfile='$RELEASE_DIR/backend/auth.pyc', doraise=True)
 print('  编译 auth.py -> backend/auth.pyc')
 "
+    python3 -c "
+import py_compile
+py_compile.compile('$SCRIPT_DIR/manage_services.py', cfile='$RELEASE_DIR/manage_services.pyc', doraise=True)
+print('  编译 manage_services.py -> manage_services.pyc')
+"
 else
     # 不编译模式：直接拷贝 .py 文件
     cp "$SCRIPT_DIR/manage_services.py" "$RELEASE_DIR/"
@@ -235,6 +240,8 @@ fi
 
 # --- 示例和配置 ---
 mkdir -p "$RELEASE_DIR/examples"
+mkdir -p "$RELEASE_DIR/examples/.services"
+mkdir -p "$RELEASE_DIR/examples/.services/logs"
 cp -r "$SCRIPT_DIR/examples/"* "$RELEASE_DIR/examples/" 2>/dev/null || true
 
 # 将配置文件中的硬编码源码路径替换为占位符，安装时再替换为实际路径
