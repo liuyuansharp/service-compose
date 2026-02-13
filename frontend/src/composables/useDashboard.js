@@ -49,18 +49,6 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
     }
   }
 
-  const setupDashboardSSE = () => {
-    if (dashboardEventSource) dashboardEventSource.close()
-    if (!authorizedFetch) return
-    if (!servicesStatus) return
-    if (!authorizedFetch) return
-    const token = authorizedFetch ? null : null
-    if (!token && !authorizedFetch) return
-    if (!servicesStatus) return
-    if (!authorizedFetch) return
-    if (!authorizedFetch) return
-  }
-
   const startDashboardSSE = (authToken, buildApiUrl) => {
     if (dashboardEventSource) dashboardEventSource.close()
     if (!authToken?.value) return

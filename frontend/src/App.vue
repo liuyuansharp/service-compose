@@ -215,14 +215,13 @@
 
     <WebShellTerminal
       :show-terminal="showTerminal"
-      :terminal-mode="terminalMode"
+      v-model:terminal-mode="terminalMode"
       :terminal-connected="terminalConnected"
       :terminal-container-ref="terminalContainer"
       :connect-terminal="connectTerminal"
       :close-terminal="closeTerminal"
       :popout-terminal="popoutTerminal"
       :t="t"
-      @update:terminal-mode="(v) => { terminalMode = v }"
     />
 
     <UserManagementModal

@@ -103,9 +103,10 @@
 </template>
 
 <script setup>
+const terminalMode = defineModel('terminalMode', { type: String, required: true })
+
 defineProps({
   showTerminal: { type: Boolean, required: true },
-  terminalMode: { type: String, required: true },
   terminalConnected: { type: Boolean, required: true },
   terminalContainerRef: { type: Object, default: null },
   connectTerminal: { type: Function, required: true },
