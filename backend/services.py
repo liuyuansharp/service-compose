@@ -94,6 +94,28 @@ def _is_physical_nic(iface: str) -> bool:
     return False
 
 
+_cached_host_ip: str = ""
+
+def _get_host_ip() -> str:
+    """Get the IP of the first physical NIC. Cached after first successful lookup."""
+    global _cached_host_ip
+    if _cached_host_ip:
+        return _cached_host_ip
+    try:
+        import socket
+        addrs = psutil.net_if_addrs()
+        for iface, addr_list in addrs.items():
+            if not _is_physical_nic(iface):
+                continue
+            for addr in addr_list:
+                if addr.family == socket.AF_INET and addr.address and addr.address != '127.0.0.1':
+                    _cached_host_ip = addr.address
+                    return _cached_host_ip
+    except Exception:
+        pass
+    return ""
+
+
 def _build_network_info() -> list:
     """Build network interfaces list with IP and real-time speed."""
     _refresh_net_io_speed()
@@ -408,6 +430,7 @@ def get_system_metrics() -> SystemMetrics:
             net_download_speed=round(net_down, 2),
             run_disk_read_speed=round(run_read, 2),
             run_disk_write_speed=round(run_write, 2),
+            host_ip=_get_host_ip(),
             timestamp=datetime.now().isoformat()
         )
     except Exception as e:
@@ -418,6 +441,7 @@ def get_system_metrics() -> SystemMetrics:
             disk_percent=0.0, disk_used=0, disk_total=0, disk_free=0,
             net_upload_speed=0.0, net_download_speed=0.0,
             run_disk_read_speed=0.0, run_disk_write_speed=0.0,
+            host_ip=_get_host_ip(),
             timestamp=datetime.now().isoformat()
         )
 

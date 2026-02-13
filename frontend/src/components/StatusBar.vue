@@ -16,6 +16,17 @@
 
         <span class="sbar-divider"></span>
 
+        <!-- Host IP -->
+        <span v-if="metrics.host_ip" class="inline-flex items-center gap-1 flex-shrink-0 text-gray-500 dark:text-gray-400 font-mono">
+          <svg viewBox="0 0 24 24" class="h-3 w-3 text-violet-500 dark:text-violet-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" />
+            <line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" />
+          </svg>
+          {{ metrics.host_ip }}
+        </span>
+
+        <span class="sbar-divider"></span>
+
         <!-- Network IO -->
         <span class="inline-flex items-center gap-1 flex-shrink-0 text-gray-500 dark:text-gray-400" :title="t('statusbar_net_io')">
           <!-- Network icon: two arrows up/down over a globe-like shape -->
@@ -41,11 +52,48 @@
           <span class="text-purple-600 dark:text-purple-400">W{{ fmtSpeed(metrics.run_disk_write_speed) }}</span>
         </span>
 
+        <span class="sbar-divider"></span>
+
+        <!-- CPU hot cores -->
+        <span class="inline-flex items-center gap-1 flex-shrink-0" :title="t('statusbar_cpu_hot')">
+          <svg viewBox="0 0 24 24" class="h-3 w-3 flex-shrink-0" :class="cpuHotColor" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <rect x="9" y="9" width="6" height="6" />
+            <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+            <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+            <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" />
+            <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" />
+          </svg>
+          <span class="font-mono" :class="cpuHotColor">{{ cpuHotCount }}/{{ cpuTotalCores }}</span>
+        </span>
+
+        <span class="sbar-divider"></span>
+
+        <!-- Memory usage -->
+        <span class="inline-flex items-center gap-1 flex-shrink-0" :title="t('statusbar_mem')">
+          <svg viewBox="0 0 24 24" class="h-3 w-3 flex-shrink-0" :class="memColor" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="1" />
+            <path d="M6 10v4" /><path d="M10 10v4" /><path d="M14 10v4" /><path d="M18 10v4" />
+          </svg>
+          <span class="font-mono" :class="memColor">{{ fmtGB(metrics.memory_used) }}/{{ fmtGB(metrics.memory_total) }}G</span>
+        </span>
+
+        <span class="sbar-divider"></span>
+
+        <!-- Disk usage -->
+        <span class="inline-flex items-center gap-1 flex-shrink-0" :title="t('statusbar_disk')">
+          <svg viewBox="0 0 24 24" class="h-3 w-3 flex-shrink-0" :class="diskColor" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+            <line x1="6" y1="16" x2="6.01" y2="16" /><line x1="10" y1="16" x2="10.01" y2="16" />
+          </svg>
+          <span class="font-mono" :class="diskColor">{{ metrics.disk_used || 0 }}/{{ metrics.disk_total || 0 }}G</span>
+        </span>
+
         <span class="sbar-divider hidden sm:block"></span>
 
         <!-- Last updated -->
         <span class="text-gray-400 dark:text-gray-500 truncate hidden sm:inline" v-if="lastUpdated">
-          {{ lastUpdated }}
+          {{ fmtTime(lastUpdated) }}
         </span>
       </div>
 
@@ -92,6 +140,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   isAdmin: { type: Boolean, default: false },
   isConnected: { type: Boolean, default: false },
@@ -103,11 +153,67 @@ const props = defineProps({
   t: { type: Function, required: true },
 })
 
+const cpuTotalCores = computed(() => {
+  const arr = props.metrics?.cpu_percents
+  return Array.isArray(arr) ? arr.length : (props.metrics?.cpu_count || 0)
+})
+
+const cpuHotCount = computed(() => {
+  const arr = props.metrics?.cpu_percents
+  if (!Array.isArray(arr)) return 0
+  return arr.filter(v => v >= 90).length
+})
+
+const cpuHotColor = computed(() => {
+  const total = cpuTotalCores.value
+  if (!total) return 'text-green-600 dark:text-green-400'
+  const pct = (cpuHotCount.value / total) * 100
+  if (pct >= 90) return 'text-red-500 dark:text-red-400'
+  if (pct >= 50) return 'text-yellow-500 dark:text-yellow-400'
+  return 'text-green-600 dark:text-green-400'
+})
+
+// memory_used / memory_total 单位 MB → GB
+function fmtGB(mb) {
+  const v = (mb || 0) / 1024
+  return v >= 100 ? v.toFixed(0) : v.toFixed(1)
+}
+
+const memColor = computed(() => {
+  const total = props.metrics?.memory_total || 1
+  const pct = ((props.metrics?.memory_used || 0) / total) * 100
+  if (pct >= 90) return 'text-red-500 dark:text-red-400'
+  if (pct >= 70) return 'text-yellow-500 dark:text-yellow-400'
+  return 'text-green-600 dark:text-green-400'
+})
+
+const diskColor = computed(() => {
+  const total = props.metrics?.disk_total || 1
+  const pct = ((props.metrics?.disk_used || 0) / total) * 100
+  if (pct >= 90) return 'text-red-500 dark:text-red-400'
+  if (pct >= 70) return 'text-yellow-500 dark:text-yellow-400'
+  return 'text-green-600 dark:text-green-400'
+})
+
 function fmtSpeed(val) {
   const v = val || 0
   if (v >= 1024) return (v / 1024).toFixed(1) + ' GB/s'
   if (v >= 1) return v.toFixed(1) + ' MB/s'
   return (v * 1024).toFixed(0) + ' KB/s'
+}
+
+function fmtTime(iso) {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d)) return iso
+    const Y = d.getFullYear()
+    const M = String(d.getMonth() + 1).padStart(2, '0')
+    const D = String(d.getDate()).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+    return `${Y}-${M}-${D} ${hh}:${mm}:${ss}`
+  } catch { return iso }
 }
 </script>
 

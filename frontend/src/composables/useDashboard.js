@@ -16,6 +16,7 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
     net_download_speed: 0,
     run_disk_read_speed: 0,
     run_disk_write_speed: 0,
+    host_ip: '',
     timestamp: ''
   })
   const lastUpdated = ref('')

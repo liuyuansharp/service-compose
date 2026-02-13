@@ -56,6 +56,7 @@ class SystemMetrics(BaseModel):
     net_download_speed: float = 0.0    # MB/s
     run_disk_read_speed: float = 0.0   # MB/s  RUN_DIR disk
     run_disk_write_speed: float = 0.0  # MB/s
+    host_ip: str = ""
     timestamp: str
 
 
