@@ -41,35 +41,33 @@
     </div>
 
     <!-- Topology layout -->
-    <div v-show="levels.length && viewMode === 'topo'" class="relative pb-4">
+    <div v-show="levels.length && viewMode === 'topo'" ref="topoContainerRef" class="relative pb-4">
       <svg
-        class="absolute inset-0 pointer-events-none"
+        class="absolute top-0 left-0 pointer-events-none overflow-visible"
         :width="svgWidth"
         :height="svgHeight"
-        style="z-index: 0;"
+        style="z-index: 2;"
       >
-        <defs>
-          <marker id="wf-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
-            <path d="M0 0 L10 4 L0 8 Z" :fill="dark ? '#64748b' : '#94a3b8'" />
-          </marker>
-        </defs>
-        <path
-          v-for="(line, li) in connectorPaths"
-          :key="li"
-          :d="line.d"
-          fill="none"
-          :stroke="dark ? '#475569' : '#cbd5e1'"
-          stroke-width="1.5"
-          marker-end="url(#wf-arrow)"
-        />
+        <template v-for="(line, li) in connectorPaths" :key="li">
+          <path
+            :d="line.d"
+            fill="none"
+            :stroke="dark ? '#475569' : '#a8b8c8'"
+            stroke-width="2"
+          />
+          <polygon
+            :points="line.arrow"
+            :fill="dark ? '#475569' : '#a8b8c8'"
+          />
+        </template>
       </svg>
 
-      <div class="relative" style="z-index: 1;">
+      <div class="relative" style="z-index: 3;">
         <div
           v-for="(level, levelIdx) in levels"
           :key="levelIdx"
-          class="flex items-start justify-center gap-3 sm:gap-4 flex-wrap"
-          :class="levelIdx > 0 ? 'mt-10 sm:mt-12' : ''"
+          class="flex items-start justify-center gap-4 sm:gap-5 flex-wrap"
+          :class="levelIdx > 0 ? 'mt-14 sm:mt-16' : ''"
         >
           <div
             v-for="nodeName in level"
@@ -307,6 +305,8 @@ const setNodeRef = (name, el) => {
   else delete nodeRefs[name]
 }
 
+const topoContainerRef = ref(null)
+
 const svgWidth = ref(0)
 const svgHeight = ref(0)
 const connectorPaths = ref([])
@@ -318,11 +318,11 @@ const calcConnectors = () => {
     return
   }
 
-  const wrapper = Object.values(nodeRefs)[0]?.closest('.workflow-wrapper')
-  if (!wrapper) return
-  const wrapperRect = wrapper.getBoundingClientRect()
-  svgWidth.value = wrapper.scrollWidth
-  svgHeight.value = wrapper.scrollHeight
+  const container = topoContainerRef.value
+  if (!container) return
+  const containerRect = container.getBoundingClientRect()
+  svgWidth.value = container.scrollWidth
+  svgHeight.value = container.scrollHeight
 
   const paths = []
   for (const edge of edges) {
@@ -333,14 +333,19 @@ const calcConnectors = () => {
     const fromRect = fromEl.getBoundingClientRect()
     const toRect = toEl.getBoundingClientRect()
 
-    const x1 = fromRect.left + fromRect.width / 2 - wrapperRect.left
-    const y1 = fromRect.bottom - wrapperRect.top
-    const x2 = toRect.left + toRect.width / 2 - wrapperRect.left
-    const y2 = toRect.top - wrapperRect.top
+    const x1 = fromRect.left + fromRect.width / 2 - containerRect.left
+    const y1 = fromRect.bottom - containerRect.top
+    const x2 = toRect.left + toRect.width / 2 - containerRect.left
+    const y2 = toRect.top - containerRect.top
 
     const midY = (y1 + y2) / 2
+    // Arrow tip sits exactly at the target card's top edge
+    const arrowH = 7
+    const arrowW = 5
+    const lineEndY = y2 - arrowH
     paths.push({
-      d: `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`
+      d: `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${lineEndY}`,
+      arrow: `${x2},${y2} ${x2 - arrowW},${y2 - arrowH} ${x2 + arrowW},${y2 - arrowH}`
     })
   }
 
@@ -350,7 +355,9 @@ const calcConnectors = () => {
 const scheduleCalc = () => {
   if (viewMode.value === 'force') return
   nextTick(() => {
-    requestAnimationFrame(calcConnectors)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(calcConnectors)
+    })
   })
 }
 
@@ -360,11 +367,22 @@ watch(() => [props.graph, props.services], scheduleCalc, { deep: true })
 
 let _resizeObserver = null
 onMounted(() => {
+  // Delay initial calc to ensure flex layout has settled
   nextTick(() => {
-    const wrapper = document.querySelector('.workflow-wrapper')
-    if (wrapper && typeof ResizeObserver !== 'undefined') {
-      _resizeObserver = new ResizeObserver(scheduleCalc)
-      _resizeObserver.observe(wrapper)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(calcConnectors)
+    })
+  })
+  // Observe topo container for resize
+  nextTick(() => {
+    const el = topoContainerRef.value
+    if (el && typeof ResizeObserver !== 'undefined') {
+      _resizeObserver = new ResizeObserver(() => {
+        if (viewMode.value !== 'force') {
+          requestAnimationFrame(calcConnectors)
+        }
+      })
+      _resizeObserver.observe(el)
     }
   })
 })
@@ -475,8 +493,11 @@ watch(viewMode, (mode) => {
       resizeChart()
     })
   } else if (mode === 'topo') {
+    // Double-rAF to ensure flex layout has settled before measuring positions
     nextTick(() => {
-      requestAnimationFrame(calcConnectors)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(calcConnectors)
+      })
     })
   }
 })
