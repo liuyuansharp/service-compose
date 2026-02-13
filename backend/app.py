@@ -14,7 +14,7 @@ if "--config" in sys.argv:
         config_index = sys.argv.index("--config")
         if config_index + 1 < len(sys.argv):
             _config.update_run_dir(sys.argv[config_index + 1])
-            logger.info(f"Using services config: {sys.argv[config_index + 1]}")
+            _config.logger.info(f"Using services config: {sys.argv[config_index + 1]}")
     except Exception:
         pass
 
@@ -1162,9 +1162,15 @@ async def websocket_terminal(websocket: WebSocket, token: Optional[str] = Query(
         await websocket.close(code=1008)
         return
 
-    require_operator(user)
-
     await websocket.accept()
+
+    try:
+        require_operator(user)
+    except HTTPException as e:
+        await websocket.send_text(f"\r\n\x1b[31mPermission denied: {e.detail}\x1b[0m\r\n")
+        await websocket.close(code=1008)
+        return
+
     logger.info(f"WebShell terminal opened by user={user['username']}")
 
     import pty

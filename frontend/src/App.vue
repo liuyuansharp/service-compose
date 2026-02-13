@@ -471,7 +471,7 @@ const {
   loadServiceGraph,
   popoutWorkflow,
   applyWorkflowViewFromUrl,
-} = useServices({ authorizedFetch, showNotification, t, currentUser })
+} = useServices({ authorizedFetch, showNotification, t, currentUser, openConfirmDialog })
 
 const {
   systemMetrics,

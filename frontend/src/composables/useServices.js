@@ -1,6 +1,6 @@
 import { ref, reactive, computed, nextTick } from 'vue'
 
-export function useServices({ authorizedFetch, showNotification, t, currentUser } = {}) {
+export function useServices({ authorizedFetch, showNotification, t, currentUser, openConfirmDialog } = {}) {
   const servicesStatus = ref([])
   const isPopoutMode = ref(false)
   const serviceViewMode = ref('list')
@@ -301,6 +301,15 @@ export function useServices({ authorizedFetch, showNotification, t, currentUser 
     }
     batchTargetServices.value = filtered
     batchSelectedServices.value = new Set(filtered.map(s => s.name))
+    if (openConfirmDialog) {
+      openConfirmDialog({
+        type: action,
+        title: t(isStart ? 'batch_start_title' : 'batch_stop_title'),
+        message: t(isStart ? 'batch_start_message' : 'batch_stop_message'),
+        confirmText: t(isStart ? 'start' : 'stop'),
+        onConfirm: () => executeBatchControl(action),
+      })
+    }
   }
 
   const isCardVisible = (cardKey) => {

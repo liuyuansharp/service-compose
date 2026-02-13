@@ -541,7 +541,7 @@ export function useLogs({
       await nextTick()
       scrollToLineCenter(matchValue)
     } else {
-      const targetLine = matchValue + 1
+      const targetLine = matchValue
       const currentLogs = logs.value[service] || []
       const found = currentLogs.find(l => l.line === targetLine)
       if (found) {
@@ -550,7 +550,7 @@ export function useLogs({
         scrollToLineCenter(targetLine)
       } else {
         const pageSize = 200
-        const pageOffset = Math.max(0, matchValue - Math.floor(pageSize / 2))
+        const pageOffset = Math.max(0, matchValue - 1 - Math.floor(pageSize / 2))
         logsLoading.value[service] = true
         try {
           const params = new URLSearchParams({ service, lines: String(pageSize), offset: String(pageOffset) })

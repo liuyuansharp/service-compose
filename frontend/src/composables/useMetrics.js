@@ -224,6 +224,7 @@ export function useMetrics({
   const openMetrics = async (service) => {
     metricsService.value = service
     await nextTick()
+    await nextTick()
     await initMetricsCharts()
     await refreshMetricsHistory()
     setupMetricsSSE(service)
@@ -277,15 +278,16 @@ export function useMetrics({
       if (response.ok) {
         const data = await response.json()
         trendData.value = data.points || []
-        nextTick(() => {
-          void renderTrendChart()
-        })
       }
     } catch (e) {
       console.error('Load metrics trend error:', e)
     } finally {
       trendLoading.value = false
     }
+    // Wait for DOM to update after trendLoading becomes false (v-if/v-else renders chart div)
+    await nextTick()
+    await nextTick()
+    void renderTrendChart()
   }
 
   const renderTrendChart = async () => {
