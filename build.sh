@@ -256,7 +256,7 @@ cat > "$RELEASE_DIR/start_backend.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 激活虚拟环境（如果存在）
@@ -274,7 +274,7 @@ cat > "$RELEASE_DIR/start_all.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 激活虚拟环境（如果存在）
@@ -287,8 +287,10 @@ CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
 echo "启动服务管理器..."
 nohup python3 -c "
 import importlib
-mod = importlib.import_module('manage_services')
+import os
 import sys
+sys.path.insert(0, os.path.abspath('$SCRIPT_DIR'))
+mod = importlib.import_module('manage_services')
 sys.argv = ['manage_services', 'start', '--config', '$CONFIG_FILE', '--daemon']
 mod.main()
 " &>/dev/null &
@@ -306,7 +308,7 @@ cat > "$RELEASE_DIR/stop_all.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 激活虚拟环境（如果存在）
@@ -319,8 +321,10 @@ CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
 echo "停止所有服务..."
 python3 -c "
 import importlib
-mod = importlib.import_module('manage_services')
+import os
 import sys
+sys.path.insert(0, os.path.abspath('$SCRIPT_DIR'))
+mod = importlib.import_module('manage_services')
 sys.argv = ['manage_services', 'stop', '--config', '$CONFIG_FILE']
 mod.main()
 " 2>/dev/null || true
@@ -335,20 +339,25 @@ chmod +x "$RELEASE_DIR/stop_all.sh"
 cat > "$RELEASE_DIR/manage_services.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 # 服务管理命令封装（兼容 .so 编译模式）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 cd "$SCRIPT_DIR"
 
 if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-python3 -c "
+MANAGE_SERVICES_DIR="$SCRIPT_DIR" python3 - "$@" << 'PY'
 import importlib
-mod = importlib.import_module('manage_services')
+import os
 import sys
+
+script_dir = os.environ.get("MANAGE_SERVICES_DIR") or os.getcwd()
+sys.path.insert(0, script_dir)
+
+mod = importlib.import_module('manage_services')
 sys.argv = ['manage_services'] + sys.argv[1:]
 mod.main()
-" "$@"
+PY
 SCRIPT_EOF
 chmod +x "$RELEASE_DIR/manage_services.sh"
 
