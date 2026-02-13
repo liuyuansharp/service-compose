@@ -41,7 +41,7 @@
     </div>
 
     <!-- Topology layout -->
-    <div v-show="levels.length && viewMode === 'topo'" class="relative overflow-x-auto pb-4">
+    <div v-show="levels.length && viewMode === 'topo'" class="relative pb-4">
       <svg
         class="absolute inset-0 pointer-events-none"
         :width="svgWidth"
@@ -68,14 +68,14 @@
         <div
           v-for="(level, levelIdx) in levels"
           :key="levelIdx"
-          class="flex items-start justify-center gap-4 sm:gap-5 flex-wrap"
+          class="flex items-start justify-center gap-3 sm:gap-4 flex-wrap"
           :class="levelIdx > 0 ? 'mt-10 sm:mt-12' : ''"
         >
           <div
             v-for="nodeName in level"
             :key="nodeName"
             :ref="el => setNodeRef(nodeName, el)"
-            class="workflow-card tech-card rounded-lg p-3 sm:p-4 transition-all w-[250px] sm:w-[270px] flex-shrink-0"
+            class="workflow-card tech-card rounded-lg p-3 transition-all min-w-[220px] max-w-[270px] flex-1"
             :class="[
               getServiceBorderClass(getServiceData(nodeName)),
               getHealthBgClass(getHealthState(getServiceData(nodeName))),
