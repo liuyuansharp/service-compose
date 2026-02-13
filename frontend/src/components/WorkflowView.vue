@@ -140,24 +140,24 @@
 
             <div class="space-y-2.5 text-[11px]">
               <div>
-                <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-400">PID</div>
-                <div class="flex items-center justify-between gap-2 mt-1">
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).pid || '—' }}</span>
-                    <button
-                      v-if="getServiceData(nodeName).pid"
-                      @click="$emit('open-pid-tree', nodeName)"
-                      class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-0.5"
-                      :title="pidTreeLabel"
-                    >
-                      <svg viewBox="0 0 24 24" class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
-                        <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
-                      </svg>
-                      {{ pidTreeLabel }}
-                    </button>
-                  </div>
-                  <span class="text-[10px] text-gray-500 dark:text-slate-400">{{ uptimeLabel }}: {{ getServiceUptimeDisplay(getServiceData(nodeName)) }}</span>
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-400">PID</div>
+                  <span class="text-[10px] text-gray-500 dark:text-slate-400 truncate">{{ uptimeLabel }}: {{ getServiceUptimeDisplay(getServiceData(nodeName)) }}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="font-mono text-gray-700 dark:text-slate-300">{{ getServiceData(nodeName).pid || '—' }}</span>
+                  <button
+                    v-if="getServiceData(nodeName).pid"
+                    @click="$emit('open-pid-tree', nodeName)"
+                    class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-300/40 dark:border-blue-500/30 hover:bg-blue-500/25 transition inline-flex items-center gap-0.5 whitespace-nowrap"
+                    :title="pidTreeLabel"
+                  >
+                    <svg viewBox="0 0 24 24" class="h-2.5 w-2.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
+                      <path d="M12 7v4M12 11l-6 6M12 11l6 6"/>
+                    </svg>
+                    {{ pidTreeLabel }}
+                  </button>
                 </div>
               </div>
               <div>
