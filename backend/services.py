@@ -380,6 +380,19 @@ def get_system_metrics() -> SystemMetrics:
         cpu_percent = round(sum(cpu_percents) / cpu_count, 2) if cpu_percents and cpu_count else 0.0
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
+
+        # Aggregate network IO for physical NICs
+        _refresh_net_io_speed()
+        net_up, net_down = 0.0, 0.0
+        for iface, (up, down) in _net_io_speed.items():
+            if _is_physical_nic(iface):
+                net_up += up
+                net_down += down
+
+        # RUN_DIR disk IO
+        _refresh_disk_io_speed()
+        run_read, run_write = _get_run_dir_disk_speed()
+
         return SystemMetrics(
             cpu_percent=round(cpu_percent, 2),
             cpu_count=cpu_count,
@@ -391,6 +404,10 @@ def get_system_metrics() -> SystemMetrics:
             disk_used=disk.used // (1024 * 1024 * 1024),
             disk_total=disk.total // (1024 * 1024 * 1024),
             disk_free=disk.free // (1024 * 1024 * 1024),
+            net_upload_speed=round(net_up, 2),
+            net_download_speed=round(net_down, 2),
+            run_disk_read_speed=round(run_read, 2),
+            run_disk_write_speed=round(run_write, 2),
             timestamp=datetime.now().isoformat()
         )
     except Exception as e:
@@ -399,6 +416,8 @@ def get_system_metrics() -> SystemMetrics:
             cpu_percent=0.0, cpu_count=0, cpu_percents=[],
             memory_percent=0.0, memory_used=0, memory_total=0,
             disk_percent=0.0, disk_used=0, disk_total=0, disk_free=0,
+            net_upload_speed=0.0, net_download_speed=0.0,
+            run_disk_read_speed=0.0, run_disk_write_speed=0.0,
             timestamp=datetime.now().isoformat()
         )
 
@@ -468,6 +487,29 @@ def _find_parent_disk(dev_name: str, io_keys) -> str:
     if m and m.group(1) in io_keys:
         return m.group(1)
     return dev_name
+
+
+def _get_run_dir_disk_speed() -> tuple:
+    """Get (read_MB_s, write_MB_s) for the disk where RUN_DIR resides."""
+    try:
+        run_path = str(RUN_DIR.resolve())
+        # Find the mount point for RUN_DIR
+        best_mount = ""
+        best_device = ""
+        for part in psutil.disk_partitions(all=False):
+            mp = part.mountpoint
+            if run_path.startswith(mp) and len(mp) > len(best_mount):
+                best_mount = mp
+                best_device = part.device
+        if not best_device:
+            return (0.0, 0.0)
+        dev_name = _device_to_disk_name(best_device)
+        io_keys = set(_disk_io_speed.keys())
+        io_name = _find_parent_disk(dev_name, io_keys)
+        speed = _disk_io_speed.get(io_name, (0.0, 0.0))
+        return speed
+    except Exception:
+        return (0.0, 0.0)
 
 
 def get_disk_partitions() -> List[DiskPartitionInfo]:

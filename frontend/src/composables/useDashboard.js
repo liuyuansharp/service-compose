@@ -12,6 +12,10 @@ export function useDashboard({ authorizedFetch, showNotification, t, servicesSta
     disk_used: 0,
     disk_total: 0,
     disk_free: 0,
+    net_upload_speed: 0,
+    net_download_speed: 0,
+    run_disk_read_speed: 0,
+    run_disk_write_speed: 0,
     timestamp: ''
   })
   const lastUpdated = ref('')

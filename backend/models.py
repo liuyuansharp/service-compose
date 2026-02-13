@@ -52,6 +52,10 @@ class SystemMetrics(BaseModel):
     disk_used: int
     disk_total: int
     disk_free: int
+    net_upload_speed: float = 0.0      # MB/s  aggregate physical NICs
+    net_download_speed: float = 0.0    # MB/s
+    run_disk_read_speed: float = 0.0   # MB/s  RUN_DIR disk
+    run_disk_write_speed: float = 0.0  # MB/s
     timestamp: str
 
 
