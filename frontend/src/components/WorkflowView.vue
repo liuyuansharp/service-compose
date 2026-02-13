@@ -384,18 +384,23 @@ const buildForceOption = () => {
   const nodes = (props.graph?.nodes || []).map(n => {
     const svc = getServiceData(n.id)
     const state = props.getHealthState(svc)
+    // Dynamically size the node to fit the name text
+    const nameLen = n.id.length
+    const baseSize = 80
+    const size = Math.max(baseSize, nameLen * 7 + 24)
+    const labelWidth = Math.max(baseSize - 16, size - 16)
     return {
       id: n.id,
       name: n.id,
       value: svc.pid ? `PID ${svc.pid}` : 'PID —',
-      symbolSize: 80,
+      symbolSize: size,
       itemStyle: { color: statusColor(state), borderColor: props.dark ? '#0f172a' : '#f8fafc', borderWidth: 2 },
       label: {
         show: true,
         formatter: `{name|${n.id}}\n{meta|${props.getServiceHealthLabel(svc)}}`,
         rich: {
-          name: { fontSize: 11, fontWeight: 600, color: props.dark ? '#e2e8f0' : '#1f2937', align: 'center', width: 120 },
-          meta: { fontSize: 10, color: props.dark ? '#cbd5f5' : '#64748b', align: 'center', width: 120 },
+          name: { fontSize: 11, fontWeight: 600, color: props.dark ? '#e2e8f0' : '#1f2937', align: 'center', width: labelWidth },
+          meta: { fontSize: 10, color: props.dark ? '#cbd5f5' : '#64748b', align: 'center', width: labelWidth },
         }
       }
     }
@@ -424,7 +429,7 @@ const buildForceOption = () => {
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: 6,
         lineStyle: { color: props.dark ? '#475569' : '#94a3b8', width: 1.2, opacity: 0.8 },
-        force: { repulsion: 220, edgeLength: 120, gravity: 0.1 },
+        force: { repulsion: 300, edgeLength: 150, gravity: 0.08 },
       }
     ]
   }
