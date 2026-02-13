@@ -384,5 +384,6 @@ export function useMetrics({
     cleanupMetricsStream,
     resetMetricsHistory,
     getMetricsPoints,
+    loadMetricsTrend,
   }
 }

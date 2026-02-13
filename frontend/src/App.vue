@@ -567,6 +567,7 @@ const {
   cleanupMetricsStream,
   resetMetricsHistory,
   getMetricsPoints,
+  loadMetricsTrend,
 } = useMetrics({
   authorizedFetch,
   buildApiUrl,
