@@ -348,13 +348,13 @@ const calcConnectors = () => {
 }
 
 const scheduleCalc = () => {
+  if (viewMode.value === 'force') return
   nextTick(() => {
     requestAnimationFrame(calcConnectors)
   })
 }
 
 onMounted(scheduleCalc)
-onUpdated(scheduleCalc)
 
 watch(() => [props.graph, props.services], scheduleCalc, { deep: true })
 
@@ -372,6 +372,7 @@ onMounted(() => {
 // ---- Force graph (ECharts) ----
 const chartRef = ref(null)
 let chartInstance = null
+let _lastForceFingerprint = ''
 
 const statusColor = (state) => {
   if (state === 'running') return '#22c55e'
@@ -429,30 +430,55 @@ const buildForceOption = () => {
   }
 }
 
-const ensureChart = () => {
+/** Build a fingerprint string from the current graph + service states to detect real changes */
+const buildForceFingerprint = () => {
+  const nodes = (props.graph?.nodes || []).map(n => {
+    const svc = getServiceData(n.id)
+    const state = props.getHealthState(svc)
+    return `${n.id}:${state}:${svc.pid || ''}`
+  })
+  const edges = (props.graph?.edges || []).map(e => `${e.from}>${e.to}`)
+  return `${props.dark ? 'd' : 'l'}|${nodes.sort().join(',')}|${edges.sort().join(',')}`
+}
+
+const ensureChart = (forceRebuild = false) => {
   if (!chartRef.value || viewMode.value !== 'force') return
-  if (!chartInstance) {
+
+  const fp = buildForceFingerprint()
+  if (!forceRebuild && chartInstance && fp === _lastForceFingerprint) return
+  _lastForceFingerprint = fp
+
+  const isNew = !chartInstance
+  if (isNew) {
     chartInstance = echarts.init(chartRef.value)
   }
-  chartInstance.setOption(buildForceOption(), true)
+
+  // Only do a full reset (second arg = true) on first init or structural graph changes
+  // For style-only updates (health state changes), merge without resetting layout
+  chartInstance.setOption(buildForceOption(), isNew || forceRebuild)
 }
 
 const resizeChart = () => {
   if (chartInstance) chartInstance.resize()
 }
 
-watch(viewMode, () => {
-  if (viewMode.value === 'force') {
+watch(viewMode, (mode) => {
+  if (mode === 'force') {
     nextTick(() => {
-      ensureChart()
+      _lastForceFingerprint = '' // force rebuild on tab switch
+      ensureChart(true)
       resizeChart()
+    })
+  } else if (mode === 'topo') {
+    nextTick(() => {
+      requestAnimationFrame(calcConnectors)
     })
   }
 })
 
 watch(() => [props.graph, props.services, props.dark], () => {
   if (viewMode.value === 'force') {
-    nextTick(() => ensureChart())
+    nextTick(() => ensureChart(false))
   }
 }, { deep: true })
 
