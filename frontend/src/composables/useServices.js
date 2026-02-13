@@ -304,8 +304,8 @@ export function useServices({ authorizedFetch, showNotification, t, currentUser,
     if (openConfirmDialog) {
       openConfirmDialog({
         type: action,
-        title: t(isStart ? 'batch_start_title' : 'batch_stop_title'),
-        message: t(isStart ? 'batch_start_message' : 'batch_stop_message'),
+        title: t(isStart ? 'batch_start_all' : 'batch_stop_all'),
+        message: t(isStart ? 'batch_start_confirm' : 'batch_stop_confirm'),
         confirmText: t(isStart ? 'start' : 'stop'),
         onConfirm: () => executeBatchControl(action),
       })
