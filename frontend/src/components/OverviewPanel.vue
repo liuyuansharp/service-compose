@@ -94,9 +94,6 @@
             </p>
             <div class="flex items-center gap-2 mt-2">
               <p class="text-xs text-gray-600 dark:text-slate-400">{{ systemMetrics.cpu_count }} {{ t('cores') }}</p>
-              <button @click="openCpuCores" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                {{ t('core_usage') }}
-              </button>
               <span class="text-gray-300 dark:text-gray-600">|</span>
               <button
                 @click="openMetricsTrend('cpu')"
@@ -204,9 +201,6 @@
               {{ systemMetrics.disk_used }} / {{ systemMetrics.disk_total }} GB
             </p>
             <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ t('disk_free') }}: {{ systemMetrics.disk_free }} GB</p>
-            <button @click="openDiskDetails" class="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline">
-              {{ t('disk_details') }}
-            </button>
           </div>
           <div
             class="w-16 h-16 rounded-full border-4"
@@ -257,9 +251,7 @@ defineProps({
   isCpuCritical: { type: Boolean, required: true },
   isMemoryCritical: { type: Boolean, required: true },
   isDiskCritical: { type: Boolean, required: true },
-  openCpuCores: { type: Function, required: true },
   openMetricsTrend: { type: Function, required: true },
-  openDiskDetails: { type: Function, required: true },
   t: { type: Function, required: true },
 })
 </script>

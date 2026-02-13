@@ -64,9 +64,7 @@
               :is-cpu-critical="isCpuCritical"
               :is-memory-critical="isMemoryCritical"
               :is-disk-critical="isDiskCritical"
-              :open-cpu-cores="openCpuCores"
               :open-metrics-trend="openMetricsTrend"
-              :open-disk-details="openDiskDetails"
               :t="t"
             />
 
