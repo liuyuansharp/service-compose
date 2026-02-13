@@ -224,6 +224,10 @@ fi
 mkdir -p "$RELEASE_DIR/examples"
 cp -r "$SCRIPT_DIR/examples/"* "$RELEASE_DIR/examples/" 2>/dev/null || true
 
+# 将配置文件中的硬编码源码路径替换为占位符，安装时再替换为实际路径
+find "$RELEASE_DIR/examples" -name "*.json" -exec \
+    sed -i "s|${SCRIPT_DIR}|__INSTALL_DIR__|g" {} \;
+
 # --- 依赖文件 ---
 cp "$SCRIPT_DIR/requirements.txt" "$RELEASE_DIR/"
 
@@ -411,6 +415,11 @@ for item in "$SCRIPT_DIR/"*; do
     [ "$base" = "vendor" ] && continue
     cp -r "$item" "$INSTALL_DIR/"
 done
+
+# 替换配置文件中的路径占位符为实际安装路径
+log_info "更新配置文件路径..."
+find "$INSTALL_DIR" -name "*.json" -exec \
+    sed -i "s|__INSTALL_DIR__|${INSTALL_DIR}|g" {} \;
 
 # 创建虚拟环境并安装打包好的依赖
 log_info "创建 Python 虚拟环境..."
