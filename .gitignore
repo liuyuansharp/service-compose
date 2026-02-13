@@ -6,3 +6,6 @@ node_modules
 nohup.out
 test
 __pycache__
+build
+build_dist
+*.c
