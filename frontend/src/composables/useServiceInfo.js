@@ -1,4 +1,4 @@
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onUnmounted } from 'vue'
 
 export function useServiceInfo({
   authorizedFetch,
@@ -14,6 +14,7 @@ export function useServiceInfo({
   const diskDetails = ref([])
   const diskLoading = ref(false)
   const diskError = ref('')
+  let _diskRefreshTimer = null
 
   const serviceInfoVisible = ref(false)
   const serviceInfoLoading = ref(false)
@@ -83,9 +84,8 @@ export function useServiceInfo({
     cpuCoresVisible.value = false
   }
 
-  const openDiskDetails = async () => {
-    diskDetailsVisible.value = true
-    diskLoading.value = true
+  const _fetchDiskDetails = async (showLoading = true) => {
+    if (showLoading) diskLoading.value = true
     diskError.value = ''
     try {
       const response = await authorizedFetch('/api/disks')
@@ -94,14 +94,35 @@ export function useServiceInfo({
       diskDetails.value = Array.isArray(data) ? data : []
     } catch (error) {
       diskError.value = error.message || t('disk_details_failed')
-      showNotification(t('disk_details_failed'), 'error')
+      if (showLoading) showNotification(t('disk_details_failed'), 'error')
     } finally {
-      diskLoading.value = false
+      if (showLoading) diskLoading.value = false
     }
+  }
+
+  const _stopDiskRefresh = () => {
+    if (_diskRefreshTimer) {
+      clearInterval(_diskRefreshTimer)
+      _diskRefreshTimer = null
+    }
+  }
+
+  const openDiskDetails = async () => {
+    diskDetailsVisible.value = true
+    await _fetchDiskDetails(true)
+    _stopDiskRefresh()
+    _diskRefreshTimer = setInterval(() => {
+      if (diskDetailsVisible.value) {
+        _fetchDiskDetails(false)
+      } else {
+        _stopDiskRefresh()
+      }
+    }, 2000)
   }
 
   const closeDiskDetails = () => {
     diskDetailsVisible.value = false
+    _stopDiskRefresh()
   }
 
   const loadServiceInfo = async (serviceName) => {
@@ -331,7 +352,12 @@ export function useServiceInfo({
     diskDetails.value = []
     diskError.value = ''
     diskLoading.value = false
+    _stopDiskRefresh()
   }
+
+  onUnmounted(() => {
+    _stopDiskRefresh()
+  })
 
   return {
     cpuCoresVisible,
