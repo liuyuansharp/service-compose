@@ -1307,15 +1307,10 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
-from pathlib import Path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-frontend_dist = PROJECT_ROOT / 'frontend' / 'dist'
-if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
-
-
 if __name__ == "__main__":
     import argparse
+    import re
+    import socket
     import uvicorn
 
     parser = argparse.ArgumentParser(description="Service Manager Dashboard API")
@@ -1324,7 +1319,50 @@ if __name__ == "__main__":
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     parser.add_argument("--config", type=str, default="", help="Services Config")
     args = parser.parse_args()
+    
+    from pathlib import Path
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    frontend_dist = PROJECT_ROOT / 'frontend' / 'dist'
+    config_js = frontend_dist / 'config.js'
 
+    # 在挂载前端前，更新前端运行时配置中的后端地址
+    def _resolve_public_host(host: str) -> str:
+        if host in ("0.0.0.0", "127.0.0.1", "::"):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.connect(("8.8.8.8", 80))
+                host = sock.getsockname()[0]
+            except Exception:
+                host = "127.0.0.1"
+            finally:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+        return host
+
+    if config_js.exists():
+        public_host = _resolve_public_host(args.host)
+        try:
+            content = config_js.read_text(encoding="utf-8")
+            content = re.sub(
+                r'apiBaseUrl:\s*".*?"',
+                f'apiBaseUrl: "http://{public_host}:{args.port}"',
+                content,
+            )
+            content = re.sub(
+                r'wsBaseUrl:\s*".*?"',
+                f'wsBaseUrl: "ws://{public_host}:{args.port}"',
+                content,
+            )
+            config_js.write_text(content, encoding="utf-8")
+            logger.info(f"Updated frontend config.js api/ws to {public_host}:{args.port}")
+        except Exception as e:
+            logger.warning(f"Failed to update frontend config.js: {e}")
+
+    if frontend_dist.exists():
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    
     logger.info(f"Starting Service Manager Dashboard API on {args.host}:{args.port}")
     logger.info(f"API documentation: http://{args.host}:{args.port}/api/docs")
           
