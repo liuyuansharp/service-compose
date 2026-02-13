@@ -361,6 +361,8 @@ PY
 SCRIPT_EOF
 chmod +x "$RELEASE_DIR/manage_services.sh"
 
+ln -s "$RELEASE_DIR/manage_services.sh" "$RELEASE_DIR/examples/.services/manage_services"
+
 # --- 安装脚本 ---
 cat > "$RELEASE_DIR/install.sh" << 'INSTALL_EOF'
 #!/bin/bash
