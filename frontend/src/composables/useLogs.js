@@ -28,6 +28,10 @@ export function useLogs({
   const LIVE_LOG_LIMIT = 5000
   const logTimeRange = ref('all')
 
+  // 跳转导航令牌，防止并发跳转操作互相覆盖
+  let _navToken = 0
+  let _navigating = false
+
   function getLogsContainer() {
     return document.getElementById('logs-container')
   }
@@ -171,7 +175,7 @@ export function useLogs({
       const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30
       followLogs.value = atBottom
     } else {
-      if (logsLoading.value[svc]) return
+      if (logsLoading.value[svc] || _navigating) return
       if (container.scrollTop === 0 && logHasMorePrev.value[svc]) {
         fetchMoreLogs('prev')
       } else if (container.scrollTop + container.clientHeight >= container.scrollHeight - 2 && logHasMoreNext.value[svc]) {
@@ -291,8 +295,10 @@ export function useLogs({
     const svc = selectedService.value
     if (!svc) return
     logLevelFilter.value = 'ALL'
-    _logSearchSuppressWatch = true
-    logSearch.value = ''
+    if (logSearch.value) {
+      _logSearchSuppressWatch = true
+      logSearch.value = ''
+    }
     searchMatches.value[svc] = []
     currentMatchIndex.value[svc] = -1
 
@@ -353,11 +359,15 @@ export function useLogs({
         if (lvl && lvl !== 'ALL') {
           fetchLogsByLevel(lvl)
         } else {
+          const token = ++_navToken
+          _navigating = true
           logsLoading.value[service] = true
           authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${toRangeQuery()}`)
             .then(async response => {
+              if (token !== _navToken) return
               if (response.ok) {
                 const data = await response.json()
+                if (token !== _navToken) return
                 logs.value[service] = data.logs
                 logsMeta.value[service] = { total: data.total, offset: data.offset }
                 if (data.log_size != null) logFileSize.value[service] = data.log_size
@@ -365,11 +375,15 @@ export function useLogs({
                 logHasMorePrev.value[service] = data.has_more_prev
                 logHasMoreNext.value[service] = data.has_more_next
                 await nextTick()
+                if (token !== _navToken) return
                 scrollLogsToBottom()
               }
             })
             .catch(() => {})
-            .finally(() => { logsLoading.value[service] = false })
+            .finally(() => {
+              logsLoading.value[service] = false
+              if (token === _navToken) _navigating = false
+            })
         }
       } else {
         followLogs.value = true
@@ -429,11 +443,15 @@ export function useLogs({
     if (!service) return
     const last = logLastPosition.value[service]
     if (!last) return
+    const token = ++_navToken
+    _navigating = true
     logsLoading.value[service] = true
     try {
       const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=${last.offset}${toRangeQuery()}`)
       if (!response.ok) throw new Error('Failed to fetch logs')
+      if (token !== _navToken) return
       const data = await response.json()
+      if (token !== _navToken) return
       logs.value[service] = data.logs
       logsMeta.value[service] = { total: data.total, offset: data.offset }
       if (data.log_size != null) logFileSize.value[service] = data.log_size
@@ -441,6 +459,7 @@ export function useLogs({
       logHasMorePrev.value[service] = data.has_more_prev
       logHasMoreNext.value[service] = data.has_more_next
       await nextTick()
+      if (token !== _navToken) return
       if (getLogsContainer()) {
         getLogsContainer().scrollTop = last.scrollTop || 0
       }
@@ -449,6 +468,7 @@ export function useLogs({
       showNotification(t('jump_failed'), 'error')
     } finally {
       logsLoading.value[service] = false
+      if (token === _navToken) _navigating = false
     }
   }
 
@@ -480,10 +500,14 @@ export function useLogs({
   const jumpToLogLine = async (globalIndex) => {
     const service = selectedService.value
     if (!service) return
+    const token = ++_navToken
+    _navigating = true
     if (logMode.value === 'history') {
       logLevelFilter.value = 'ALL'
-      _logSearchSuppressWatch = true
-      logSearch.value = ''
+      if (logSearch.value) {
+        _logSearchSuppressWatch = true
+        logSearch.value = ''
+      }
     }
     const pageSize = 200
     const pageOffset = Math.floor(globalIndex / pageSize) * pageSize
@@ -491,27 +515,31 @@ export function useLogs({
     try {
       const response = await authorizedFetch(`/api/logs?service=${service}&lines=${pageSize}&offset=${pageOffset}${toRangeQuery()}`)
       if (!response.ok) throw new Error('Failed to fetch logs')
+      if (token !== _navToken) return
       const data = await response.json()
+      if (token !== _navToken) return
       logs.value[service] = data.logs
       logsMeta.value[service] = { total: data.total, offset: data.offset }
       if (data.log_size != null) logFileSize.value[service] = data.log_size
       logOffset.value[service] = data.offset
       logHasMorePrev.value[service] = data.has_more_prev
       logHasMoreNext.value[service] = data.has_more_next
-      logsLoading.value[service] = false
       let targetLine = globalIndex + 1
       if (Array.isArray(data.logs)) {
         const found = data.logs.find(l => typeof l.line === 'number' && (l.line - 1) === globalIndex)
         if (found) targetLine = found.line
       }
+      logsLoading.value[service] = false
       await nextTick()
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      if (token !== _navToken) return
       scrollToLineCenter(targetLine)
     } catch (e) {
       console.error('Jump to log line error:', e)
       showNotification(t('jump_failed'), 'error')
     } finally {
       logsLoading.value[service] = false
+      if (token === _navToken) _navigating = false
     }
   }
 
@@ -553,6 +581,8 @@ export function useLogs({
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
         scrollToLineCenter(targetLine)
       } else {
+        const token = ++_navToken
+        _navigating = true
         const pageSize = 200
         const pageOffset = Math.max(0, matchValue - 1 - Math.floor(pageSize / 2))
         logsLoading.value[service] = true
@@ -561,7 +591,9 @@ export function useLogs({
           const rangeQ = toRangeQuery()
           const response = await authorizedFetch(`/api/logs?${params.toString()}${rangeQ}`)
           if (!response.ok) throw new Error('Failed to fetch logs')
+          if (token !== _navToken) return
           const data = await response.json()
+          if (token !== _navToken) return
           logs.value[service] = data.logs
           logsMeta.value[service] = { total: data.total, offset: data.offset }
           if (data.log_size != null) logFileSize.value[service] = data.log_size
@@ -571,11 +603,13 @@ export function useLogs({
           logsLoading.value[service] = false
           await nextTick()
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+          if (token !== _navToken) return
           scrollToLineCenter(targetLine)
         } catch (e) {
           console.error('Search match jump error:', e)
         } finally {
           logsLoading.value[service] = false
+          if (token === _navToken) _navigating = false
         }
       }
     }
@@ -583,8 +617,10 @@ export function useLogs({
 
   const loadLogs = async (service) => {
     selectedService.value = service
-    _logSearchSuppressWatch = true
-    logSearch.value = ''
+    if (logSearch.value) {
+      _logSearchSuppressWatch = true
+      logSearch.value = ''
+    }
     logsLoading.value[service] = true
     logs.value[service] = []
     logOffset.value[service] = 0
@@ -765,12 +801,16 @@ export function useLogs({
       getLogsContainer().scrollTop = getLogsContainer().scrollHeight
       return
     }
+    const token = ++_navToken
+    _navigating = true
     logsLoading.value[service] = true
     try {
       const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
       const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=-200${lvl}${toRangeQuery()}`)
       if (!response.ok) throw new Error('Failed to fetch logs')
+      if (token !== _navToken) return
       const data = await response.json()
+      if (token !== _navToken) return
       logs.value[service] = data.logs
       logsMeta.value[service] = { total: data.total, offset: data.offset }
       if (data.log_size != null) logFileSize.value[service] = data.log_size
@@ -779,12 +819,14 @@ export function useLogs({
       logHasMoreNext.value[service] = data.has_more_next
       await nextTick()
       await nextTick()
+      if (token !== _navToken) return
       scrollLogsToBottom()
     } catch (e) {
       console.error('Go to bottom error:', e)
       showNotification(t('jump_failed'), 'error')
     } finally {
       logsLoading.value[service] = false
+      if (token === _navToken) _navigating = false
     }
   }
 
@@ -798,12 +840,16 @@ export function useLogs({
       getLogsContainer().scrollTop = 0
       return
     }
+    const token = ++_navToken
+    _navigating = true
     logsLoading.value[service] = true
     try {
       const lvl = logLevelFilter.value && logLevelFilter.value !== 'ALL' ? `&level=${encodeURIComponent(logLevelFilter.value)}` : ''
       const response = await authorizedFetch(`/api/logs?service=${service}&lines=200&offset=0${lvl}${toRangeQuery()}`)
       if (!response.ok) throw new Error('Failed to fetch logs')
+      if (token !== _navToken) return
       const data = await response.json()
+      if (token !== _navToken) return
       logs.value[service] = data.logs
       logsMeta.value[service] = { total: data.total, offset: data.offset }
       if (data.log_size != null) logFileSize.value[service] = data.log_size
@@ -812,12 +858,14 @@ export function useLogs({
       logHasMoreNext.value[service] = data.has_more_next
       await nextTick()
       await nextTick()
+      if (token !== _navToken) return
       scrollLogsToTop()
     } catch (e) {
       console.error('Go to top error:', e)
       showNotification(t('jump_failed'), 'error')
     } finally {
       logsLoading.value[service] = false
+      if (token === _navToken) _navigating = false
     }
   }
 
