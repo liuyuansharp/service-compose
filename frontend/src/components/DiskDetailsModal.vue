@@ -29,12 +29,14 @@
           {{ t('no_disk_data') }}
         </div>
         <div v-else class="space-y-3">
+          <!-- Header row (desktop) -->
           <div class="hidden sm:grid grid-cols-12 text-xs text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-            <div class="col-span-3">{{ t('disk_device') }}</div>
-            <div class="col-span-3">{{ t('disk_mount') }}</div>
-            <div class="col-span-2">{{ t('disk_type') }}</div>
+            <div class="col-span-2">{{ t('disk_device') }}</div>
+            <div class="col-span-2">{{ t('disk_mount') }}</div>
+            <div class="col-span-1">{{ t('disk_type') }}</div>
             <div class="col-span-2 text-right">{{ t('disk_total') }}</div>
             <div class="col-span-2 text-right">{{ t('disk_usage') }}</div>
+            <div class="col-span-3 text-right">{{ t('disk_io') }}</div>
           </div>
           <div
             v-for="(disk, idx) in diskDetails"
@@ -43,13 +45,13 @@
           >
             <!-- Desktop: grid layout -->
             <div class="hidden sm:grid grid-cols-12 items-center gap-3">
-              <div class="col-span-3 font-mono text-gray-700 dark:text-slate-200 truncate" :title="disk.device">
+              <div class="col-span-2 font-mono text-gray-700 dark:text-slate-200 truncate" :title="disk.device">
                 {{ disk.device || '—' }}
               </div>
-              <div class="col-span-3 font-mono text-gray-600 dark:text-slate-300 truncate" :title="disk.mountpoint">
+              <div class="col-span-2 font-mono text-gray-600 dark:text-slate-300 truncate" :title="disk.mountpoint">
                 {{ disk.mountpoint || '—' }}
               </div>
-              <div class="col-span-2 text-gray-600 dark:text-slate-300">
+              <div class="col-span-1 text-gray-600 dark:text-slate-300">
                 {{ disk.fstype || '—' }}
               </div>
               <div class="col-span-2 text-right font-mono text-gray-700 dark:text-slate-200">
@@ -68,6 +70,26 @@
                 </div>
                 <div class="mt-1 text-xs font-mono text-gray-500 dark:text-slate-400 text-right">
                   {{ Number(disk.percent).toFixed(0) }}%
+                </div>
+              </div>
+              <!-- IO column -->
+              <div class="col-span-3 text-right space-y-1">
+                <div class="flex items-center justify-end gap-1.5">
+                  <span class="inline-flex items-center gap-0.5">
+                    <svg viewBox="0 0 12 12" class="h-3 w-3 text-emerald-500"><path d="M6 2v8M3 7l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="text-xs font-mono text-gray-600 dark:text-slate-300">{{ t('disk_io_read') }}</span>
+                  </span>
+                  <span class="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">{{ formatSpeed(disk.io_read_speed) }}</span>
+                </div>
+                <div class="flex items-center justify-end gap-1.5">
+                  <span class="inline-flex items-center gap-0.5">
+                    <svg viewBox="0 0 12 12" class="h-3 w-3 text-orange-500"><path d="M6 10V2M3 5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="text-xs font-mono text-gray-600 dark:text-slate-300">{{ t('disk_io_write') }}</span>
+                  </span>
+                  <span class="text-xs font-mono font-semibold text-orange-600 dark:text-orange-400">{{ formatSpeed(disk.io_write_speed) }}</span>
+                </div>
+                <div class="text-[10px] text-gray-400 dark:text-slate-500 font-mono">
+                  {{ t('disk_io_total_rw') }}: {{ disk.io_read_total ?? 0 }} / {{ disk.io_write_total ?? 0 }} GB
                 </div>
               </div>
             </div>
@@ -89,6 +111,17 @@
                   :style="{ width: `${Math.min(disk.percent, 100)}%` }"
                 ></div>
               </div>
+              <!-- IO row (mobile) -->
+              <div class="flex items-center justify-between text-xs font-mono pt-1 border-t border-gray-200 dark:border-slate-800">
+                <span class="inline-flex items-center gap-1">
+                  <svg viewBox="0 0 12 12" class="h-3 w-3 text-emerald-500"><path d="M6 2v8M3 7l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span class="text-emerald-600 dark:text-emerald-400">{{ formatSpeed(disk.io_read_speed) }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1">
+                  <svg viewBox="0 0 12 12" class="h-3 w-3 text-orange-500"><path d="M6 10V2M3 5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span class="text-orange-600 dark:text-orange-400">{{ formatSpeed(disk.io_write_speed) }}</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -106,4 +139,11 @@ defineProps({
   closeDiskDetails: { type: Function, required: true },
   t: { type: Function, required: true },
 })
+
+const formatSpeed = (mbps) => {
+  if (mbps === undefined || mbps === null) return '0 KB/s'
+  if (mbps >= 1024) return `${(mbps / 1024).toFixed(1)} GB/s`
+  if (mbps >= 1) return `${mbps.toFixed(1)} MB/s`
+  return `${(mbps * 1024).toFixed(0)} KB/s`
+}
 </script>

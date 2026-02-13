@@ -309,7 +309,78 @@ def get_system_metrics() -> SystemMetrics:
         )
 
 
+# ---------- Disk IO speed tracking ----------
+import time as _disk_time
+
+_disk_io_prev: Dict = {}        # {disk_name: (read_bytes, write_bytes, timestamp)}
+_disk_io_speed: Dict = {}       # {disk_name: (read_MB_s, write_MB_s)}
+
+
+def _refresh_disk_io_speed():
+    """Sample disk_io_counters to compute per-device read/write MB/s."""
+    global _disk_io_prev, _disk_io_speed
+    try:
+        counters = psutil.disk_io_counters(perdisk=True)
+    except Exception:
+        return
+    if not counters:
+        return
+    now = _disk_time.time()
+    for name, c in counters.items():
+        prev = _disk_io_prev.get(name)
+        if prev:
+            dt = now - prev[2]
+            if dt > 0:
+                r_speed = (c.read_bytes - prev[0]) / dt / (1024 * 1024)
+                w_speed = (c.write_bytes - prev[1]) / dt / (1024 * 1024)
+                _disk_io_speed[name] = (max(round(r_speed, 2), 0), max(round(w_speed, 2), 0))
+        _disk_io_prev[name] = (c.read_bytes, c.write_bytes, now)
+
+
+def _get_disk_io_totals() -> Dict:
+    """Get cumulative IO totals in GB per device."""
+    totals: Dict = {}
+    try:
+        counters = psutil.disk_io_counters(perdisk=True)
+        if counters:
+            for name, c in counters.items():
+                totals[name] = (
+                    round(c.read_bytes / (1024 ** 3), 2),
+                    round(c.write_bytes / (1024 ** 3), 2),
+                )
+    except Exception:
+        pass
+    return totals
+
+
+def _device_to_disk_name(device: str) -> str:
+    """Map /dev/sda1 -> sda1, /dev/nvme0n1p1 -> nvme0n1p1, etc."""
+    return os.path.basename(device)
+
+
+def _find_parent_disk(dev_name: str, io_keys) -> str:
+    """Try to match partition dev_name to a parent whole-disk in io_keys.
+    e.g. sda1 -> sda, nvme0n1p1 -> nvme0n1"""
+    if dev_name in io_keys:
+        return dev_name
+    # strip trailing partition number: sda1 -> sda
+    import re
+    # NVMe: nvme0n1p1 -> nvme0n1
+    m = re.match(r'^(nvme\d+n\d+)p\d+$', dev_name)
+    if m and m.group(1) in io_keys:
+        return m.group(1)
+    # sd/hd/vd: sda1 -> sda
+    m = re.match(r'^([a-z]+)(\d+)$', dev_name)
+    if m and m.group(1) in io_keys:
+        return m.group(1)
+    return dev_name
+
+
 def get_disk_partitions() -> List[DiskPartitionInfo]:
+    _refresh_disk_io_speed()
+    io_totals = _get_disk_io_totals()
+    io_keys = set(_disk_io_speed.keys()) | set(io_totals.keys())
+
     partitions = []
     seen = set()
     network_fs = {'nfs', 'nfs4', 'cifs', 'smbfs', 'sshfs', 'fuse.sshfs', 'fuse.glusterfs',
@@ -331,12 +402,22 @@ def get_disk_partitions() -> List[DiskPartitionInfo]:
             usage = psutil.disk_usage(part.mountpoint)
         except PermissionError:
             continue
+
+        dev_name = _device_to_disk_name(part.device)
+        io_name = _find_parent_disk(dev_name, io_keys)
+        speed = _disk_io_speed.get(io_name, (0.0, 0.0))
+        total_io = io_totals.get(io_name, (0.0, 0.0))
+
         partitions.append(DiskPartitionInfo(
             device=part.device, mountpoint=part.mountpoint, fstype=part.fstype,
             total_gb=usage.total // (1024 * 1024 * 1024),
             used_gb=usage.used // (1024 * 1024 * 1024),
             free_gb=usage.free // (1024 * 1024 * 1024),
-            percent=round(usage.percent, 2)
+            percent=round(usage.percent, 2),
+            io_read_speed=speed[0],
+            io_write_speed=speed[1],
+            io_read_total=total_io[0],
+            io_write_total=total_io[1],
         ))
     partitions.sort(key=lambda item: item.total_gb, reverse=True)
     return partitions

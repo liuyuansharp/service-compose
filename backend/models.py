@@ -63,6 +63,10 @@ class DiskPartitionInfo(BaseModel):
     used_gb: int
     free_gb: int
     percent: float
+    io_read_speed: float = 0.0     # MB/s
+    io_write_speed: float = 0.0    # MB/s
+    io_read_total: float = 0.0     # GB cumulative
+    io_write_total: float = 0.0    # GB cumulative
 
 
 class DashboardStatus(BaseModel):
