@@ -313,6 +313,7 @@
 
     <StatusBar
       v-if="!isPopoutMode"
+      :current-user="currentUser"
       :is-admin="isAdmin"
       :is-connected="isConnected"
       :last-updated="lastUpdated"

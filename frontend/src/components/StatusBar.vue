@@ -16,6 +16,16 @@
 
         <span class="sbar-divider"></span>
 
+        <!-- Current user -->
+        <span v-if="currentUser?.username" class="inline-flex items-center gap-1 flex-shrink-0 text-gray-500 dark:text-gray-400">
+          <svg viewBox="0 0 24 24" class="h-3 w-3 text-sky-500 dark:text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+          </svg>
+          <span class="truncate max-w-[60px]">{{ currentUser.username }}</span>
+        </span>
+
+        <span class="sbar-divider"></span>
+
         <!-- Host IP -->
         <span v-if="metrics.host_ip" class="inline-flex items-center gap-1 flex-shrink-0 text-gray-500 dark:text-gray-400 font-mono">
           <svg viewBox="0 0 24 24" class="h-3 w-3 text-violet-500 dark:text-violet-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -143,6 +153,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({
+  currentUser: { type: [Object, null], default: null },
   isAdmin: { type: Boolean, default: false },
   isConnected: { type: Boolean, default: false },
   lastUpdated: { type: String, default: '' },
