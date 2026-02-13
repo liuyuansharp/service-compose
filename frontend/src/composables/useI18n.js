@@ -702,7 +702,7 @@ export function useI18n() {
     localStorage.setItem('lang', lang.value)
   }, { immediate: true })
 
-  const langLabel = computed(() => (lang.value === 'zh' ? 'EN' : '中文'))
+  const langLabel = computed(() => (lang.value === 'zh' ? 'En' : '中'))
 
   const toggleLanguage = () => {
     lang.value = lang.value === 'zh' ? 'en' : 'zh'

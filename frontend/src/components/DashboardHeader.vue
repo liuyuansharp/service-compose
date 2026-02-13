@@ -46,11 +46,7 @@
             class="hdr-icon-btn"
             :title="langLabel"
           >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
+            <span class="text-[11px] font-bold leading-none">{{ langLabel }}</span>
           </button>
 
           <!-- Theme -->
