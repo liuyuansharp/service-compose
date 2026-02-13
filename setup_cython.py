@@ -53,10 +53,10 @@ def collect_py_files():
         module_name = str(rel.with_suffix('')).replace('/', '.')
         py_files.append((str(py_file), module_name))
 
-    # 收集根目录的 manage_services.py
-    manage_file = ROOT_DIR / 'manage_services.py'
-    if manage_file.exists():
-        py_files.append((str(manage_file), 'manage_services'))
+    # # 收集根目录的 manage_services.py
+    # manage_file = ROOT_DIR / 'manage_services.py'
+    # if manage_file.exists():
+    #     py_files.append((str(manage_file), 'manage_services'))
 
     return py_files
 
