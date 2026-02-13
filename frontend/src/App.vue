@@ -37,13 +37,11 @@
           :on-logout="() => logout()"
           :toggle-language="toggleLanguage"
           :toggle-theme="toggleTheme"
-          :on-open-terminal="() => { showTerminal = true }"
-          :refresh-status="refreshStatus"
           :t="t"
         />
 
         <!-- Main Content -->
-        <main :class="isPopoutMode ? 'px-2 py-2' : 'max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6'">
+        <main :class="isPopoutMode ? 'px-2 py-2' : 'max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-12'">
           <div class="tech-shell">
             <div v-if="!isPopoutMode" class="tech-ornament"></div>
             <OverviewPanel
@@ -313,6 +311,16 @@
     />
 
     <ToastNotifications :notification="notification" />
+
+    <StatusBar
+      v-if="!isPopoutMode"
+      :is-admin="isAdmin"
+      :is-connected="isConnected"
+      :last-updated="lastUpdated"
+      :on-open-terminal="() => { showTerminal = true }"
+      :refresh-status="refreshStatus"
+      :t="t"
+    />
     </AuthShell>
   </div>
 </template>
@@ -323,6 +331,7 @@ import SystemMetricsTrendModal from './components/SystemMetricsTrendModal.vue'
 import SystemInfoModal from './components/SystemInfoModal.vue'
 import CustomConfirmDialog from './components/CustomConfirmDialog.vue'
 import ToastNotifications from './components/ToastNotifications.vue'
+import StatusBar from './components/StatusBar.vue'
 import ProcessTreeModal from './components/ProcessTreeModal.vue'
 import CpuCoreDetailsModal from './components/CpuCoreDetailsModal.vue'
 import DiskDetailsModal from './components/DiskDetailsModal.vue'

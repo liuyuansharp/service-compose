@@ -16,30 +16,6 @@
 
         <!-- Right: toolbar -->
         <div class="flex items-center gap-2 flex-wrap justify-end">
-          <!-- Terminal (admin) -->
-          <button
-            v-if="isAdmin"
-            @click="onOpenTerminal"
-            class="hdr-btn"
-            :title="t('terminal')"
-          >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
-            </svg>
-            <span class="hidden sm:inline">{{ t('terminal') }}</span>
-          </button>
-
-          <!-- Refresh -->
-          <button
-            @click="refreshStatus"
-            class="hdr-icon-btn text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"
-            :title="t('refresh')"
-          >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v6h-6" />
-            </svg>
-          </button>
-
           <!-- Language -->
           <button
             @click="toggleLanguage"
@@ -185,8 +161,6 @@ const props = defineProps({
   onLogout: { type: Function, required: true },
   toggleLanguage: { type: Function, required: true },
   toggleTheme: { type: Function, required: true },
-  onOpenTerminal: { type: Function, required: true },
-  refreshStatus: { type: Function, required: true },
   t: { type: Function, required: true },
 })
 
