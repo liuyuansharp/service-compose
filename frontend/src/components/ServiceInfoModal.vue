@@ -39,7 +39,7 @@
                 <p class="text-xs text-gray-500 dark:text-slate-400">{{ t('info_version') }}</p>
                 <button
                   v-if="canOperate"
-                  @click="triggerUpdateUpload"
+                  @click="onClickUpload"
                   class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
                 >
                   {{ t('upload_package') }}
@@ -48,7 +48,7 @@
               <p class="text-sm font-mono text-gray-800 dark:text-slate-100 mt-1">{{ serviceInfo.version }}</p>
               <input
                 v-if="canOperate"
-                ref="updateFileInput"
+                ref="updateFileInputRef"
                 type="file"
                 class="hidden"
                 accept=".tar.gz"
@@ -200,7 +200,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 const selectedBackup = defineModel('selectedBackup', { type: [String, null], default: null })
+
+const updateFileInputRef = ref(null)
+const onClickUpload = () => {
+  updateFileInputRef.value?.click()
+}
 
 defineProps({
   serviceInfoVisible: { type: Boolean, required: true },
@@ -208,7 +215,6 @@ defineProps({
   serviceInfoError: { type: [String, null], default: null },
   serviceInfo: { type: [Object, null], default: null },
   canOperate: { type: Boolean, required: true },
-  triggerUpdateUpload: { type: Function, required: true },
   handleUpdateFileChange: { type: Function, required: true },
   loadBackups: { type: Function, required: true },
   backupsLoading: { type: Boolean, required: true },

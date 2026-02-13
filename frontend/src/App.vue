@@ -129,7 +129,6 @@
       :service-info-error="serviceInfoError"
       :service-info="serviceInfo"
       :can-operate="canOperate"
-      :trigger-update-upload="triggerUpdateUpload"
       :handle-update-file-change="handleUpdateFileChange"
       :load-backups="loadBackups"
       :backups-loading="backupsLoading"
@@ -616,13 +615,11 @@ const {
   serviceInfoLoading,
   serviceInfoError,
   serviceInfo,
-  updateFileInput,
   uploadingUpdate,
   updatingService,
   uploadProgress,
   updateProgress,
   updateStatus,
-  triggerUpdateUpload,
   handleUpdateFileChange,
   backupsLoading,
   backupsError,
