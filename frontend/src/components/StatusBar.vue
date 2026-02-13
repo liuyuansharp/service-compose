@@ -26,6 +26,20 @@
       <!-- Right: actions -->
       <div class="flex items-center gap-1.5 flex-shrink-0">
         <button
+          @click="onOpenSystemInfo"
+          class="sbar-btn"
+          :title="t('sysinfo_title')"
+        >
+          <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+            <path d="M7 8h2" /><path d="M7 11h4" /><circle cx="16" cy="9.5" r="2" />
+          </svg>
+          <span>{{ t('sysinfo_title') }}</span>
+        </button>
+
+        <span class="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
+
+        <button
           v-if="isAdmin"
           @click="onOpenTerminal"
           class="sbar-btn"
@@ -56,6 +70,7 @@ defineProps({
   isAdmin: { type: Boolean, default: false },
   isConnected: { type: Boolean, default: false },
   lastUpdated: { type: String, default: '' },
+  onOpenSystemInfo: { type: Function, required: true },
   onOpenTerminal: { type: Function, required: true },
   refreshStatus: { type: Function, required: true },
   t: { type: Function, required: true },

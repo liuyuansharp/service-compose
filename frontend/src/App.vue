@@ -67,7 +67,6 @@
               :open-cpu-cores="openCpuCores"
               :open-metrics-trend="openMetricsTrend"
               :open-disk-details="openDiskDetails"
-              :open-system-info="() => { showSystemInfo = true }"
               :t="t"
             />
 
@@ -317,6 +316,7 @@
       :is-admin="isAdmin"
       :is-connected="isConnected"
       :last-updated="lastUpdated"
+      :on-open-system-info="() => { showSystemInfo = true }"
       :on-open-terminal="() => { showTerminal = true }"
       :refresh-status="refreshStatus"
       :t="t"
