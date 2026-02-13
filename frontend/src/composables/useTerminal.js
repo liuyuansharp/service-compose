@@ -220,7 +220,14 @@ ${xtermCss}
 
   watch(showTerminal, (val) => {
     if (val && terminalMode.value !== 'minimized') {
-      nextTick(() => initTerminal())
+      nextTick(() => {
+        initTerminal()
+        // Always ensure a live websocket when opening terminal panel
+        connectTerminal()
+        nextTick(() => {
+          if (termInstance) termInstance.focus()
+        })
+      })
     }
   })
 
