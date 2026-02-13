@@ -1307,7 +1307,9 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
-frontend_dist = RUN_DIR / 'frontend' / 'dist'
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+frontend_dist = PROJECT_ROOT / 'frontend' / 'dist'
 if frontend_dist.exists():
     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 

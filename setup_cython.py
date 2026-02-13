@@ -28,9 +28,12 @@ EXCLUDE_FILES = {
     'install.sh',
 }
 
-# __init__.py 保留为源码（包初始化文件需要保留）
+# __init__.py / app.py 保留为源码（不做 Cython 编译）
+# - __init__.py: 包初始化文件，python -m 需要
+# - app.py: FastAPI 路由使用 Depends() 依赖注入，Cython 编译后类型检查冲突
 KEEP_AS_SOURCE = {
     '__init__.py',
+    'app.py',
 }
 
 
