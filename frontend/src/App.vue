@@ -74,6 +74,7 @@
               v-model:service-view-mode="serviceViewMode"
               :is-popout-mode="isPopoutMode"
               :can-operate="canOperate"
+              :is-admin="isAdmin"
               :visible-services="visibleServices"
               :controlling="controlling"
               :all-services-running="allServicesRunning"

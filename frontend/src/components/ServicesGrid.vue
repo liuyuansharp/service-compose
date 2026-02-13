@@ -9,7 +9,7 @@
       </div>
 
       <div class="flex items-center gap-1.5">
-        <div class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
+        <div v-if="isAdmin" class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
           <button
             @click="serviceViewMode = 'list'"
             class="p-1.5 rounded transition"
@@ -236,6 +236,7 @@ const serviceViewMode = defineModel('serviceViewMode', { type: String, required:
 defineProps({
   isPopoutMode: { type: Boolean, required: true },
   canOperate: { type: Boolean, required: true },
+  isAdmin: { type: Boolean, default: false },
   visibleServices: { type: Array, required: true },
   controlling: { type: Boolean, required: true },
   allServicesRunning: { type: Boolean, required: true },
