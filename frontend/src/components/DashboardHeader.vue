@@ -2,6 +2,7 @@
   <header class="tech-header border-b border-white/10">
     <div class="max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <!-- Left: title -->
         <div class="flex-shrink-0">
           <h1 class="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-slate-100 inline-flex items-center gap-2 sm:gap-3">
             {{ t('dashboard_title') }}
@@ -12,17 +13,67 @@
           </h1>
           <p class="text-xs sm:text-sm text-gray-600 dark:text-slate-400 mt-1">{{ t('dashboard_subtitle') }}</p>
         </div>
-        <div class="w-full sm:w-auto sm:text-right">
-          <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-sm text-gray-600">
-            <span class="inline-flex items-center gap-2 text-gray-600 dark:text-gray-300">
-              <span class="h-7 w-7 rounded-full border border-cyan-300/60 dark:border-cyan-400/30 bg-white/60 dark:bg-slate-800/60 shadow-[0_0_10px_rgba(34,211,238,0.35)] flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" class="h-4 w-4 text-cyan-600 dark:text-cyan-300" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+
+        <!-- Right: toolbar -->
+        <div class="flex items-center gap-2 flex-wrap justify-end">
+          <!-- Terminal (admin) -->
+          <button
+            v-if="isAdmin"
+            @click="onOpenTerminal"
+            class="hdr-btn"
+            :title="t('terminal')"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            <span class="hidden sm:inline">{{ t('terminal') }}</span>
+          </button>
+
+          <!-- Refresh -->
+          <button
+            @click="refreshStatus"
+            class="hdr-icon-btn text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+            :title="t('refresh')"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v6h-6" />
+            </svg>
+          </button>
+
+          <!-- Language -->
+          <button
+            @click="toggleLanguage"
+            class="hdr-icon-btn"
+            :title="langLabel"
+          >
+            <span class="text-[11px] font-semibold leading-none">{{ langLabel }}</span>
+          </button>
+
+          <!-- Theme -->
+          <button
+            @click="toggleTheme"
+            class="hdr-icon-btn"
+            :title="themeLabel"
+          >
+            <span class="text-[11px] font-semibold leading-none">{{ themeLabel }}</span>
+          </button>
+
+          <!-- Divider -->
+          <span class="hidden sm:block w-px h-5 bg-gray-300 dark:bg-slate-700"></span>
+
+          <!-- Personal Center dropdown -->
+          <div class="relative" ref="dropdownRef">
+            <button
+              @click="showDropdown = !showDropdown"
+              class="hdr-btn gap-1.5"
+            >
+              <span class="h-6 w-6 rounded-full border border-cyan-300/60 dark:border-cyan-400/30 bg-white/60 dark:bg-slate-800/60 shadow-[0_0_8px_rgba(34,211,238,0.3)] flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-300" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="8" r="3.5" />
                   <path d="M4 20c1.8-3.6 5-5.4 8-5.4s6.2 1.8 8 5.4" />
-                  <path d="M6 8h2M16 8h2" />
                 </svg>
               </span>
-              <span class="truncate max-w-[80px] sm:max-w-none">{{ currentUser?.username || t('user') }}</span>
+              <span class="text-sm truncate max-w-[72px] sm:max-w-none">{{ currentUser?.username || t('user') }}</span>
               <span
                 class="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
                 :class="
@@ -33,77 +84,72 @@
                     : 'bg-gray-500/20 text-gray-400 border border-gray-400/30'
                 "
               >{{ t('role_' + userRole) }}</span>
-            </span>
-            <button
-              v-if="isAdmin"
-              @click="onOpenUserManagement"
-              class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
-              :title="t('user_management')"
-            >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="9" cy="7" r="3" />
-                <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-                <path d="M19 8v6" />
-                <path d="M16 11h6" />
+              <!-- chevron -->
+              <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 ml-0.5 transition-transform" :class="showDropdown ? 'rotate-180' : ''" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
               </svg>
-              <span class="hidden sm:inline">{{ t('user_management') }}</span>
             </button>
-            <button
-              @click="onOpenAuditLog"
-              class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button inline-flex items-center gap-1"
-              :title="t('audit_log')"
+
+            <!-- Dropdown menu -->
+            <Transition
+              enter-active-class="transition ease-out duration-100"
+              enter-from-class="opacity-0 scale-95"
+              enter-to-class="opacity-100 scale-100"
+              leave-active-class="transition ease-in duration-75"
+              leave-from-class="opacity-100 scale-100"
+              leave-to-class="opacity-0 scale-95"
             >
-              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              <span class="hidden sm:inline">{{ t('audit_log') }}</span>
-            </button>
-            <button
-              @click="onLogout"
-              class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
-            >
-              {{ t('logout') }}
-            </button>
-            <button
-              @click="toggleLanguage"
-              class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
-            >
-              {{ langLabel }}
-            </button>
-            <button
-              @click="toggleTheme"
-              class="px-2 sm:px-3 py-1 border border-gray-200 dark:border-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 glass-button"
-            >
-              {{ themeLabel }}
-            </button>
-          </div>
-          <div class="mt-2 flex flex-wrap items-center justify-start sm:justify-end gap-2">
-            <button
-              v-if="isAdmin"
-              @click="onOpenTerminal"
-              class="px-3 py-1.5 bg-gray-700 text-white rounded-md hover:bg-gray-800 dark:bg-slate-600 dark:hover:bg-slate-500 transition text-sm inline-flex items-center gap-2 glass-button-solid"
-              :title="t('terminal')"
-            >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-              {{ t('terminal') }}
-            </button>
-            <button
-              @click="refreshStatus"
-              class="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm inline-flex items-center gap-2 glass-button-solid"
-            >
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                <path d="M20 4v6h-6" />
-              </svg>
-              {{ t('refresh') }}
-            </button>
+              <div
+                v-if="showDropdown"
+                class="absolute right-0 top-full mt-1.5 w-48 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-xl dark:shadow-black/40 ring-1 ring-black/5 dark:ring-white/5 z-50 py-1 origin-top-right"
+              >
+                <!-- Header: personal center -->
+                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                  <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{{ t('personal_center') }}</p>
+                </div>
+
+                <!-- User Management (admin only) -->
+                <button
+                  v-if="isAdmin"
+                  @click="handleMenuItem(onOpenUserManagement)"
+                  class="dropdown-item"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="7" r="3" />
+                    <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                    <path d="M19 8v6" /><path d="M16 11h6" />
+                  </svg>
+                  {{ t('user_management') }}
+                </button>
+
+                <!-- Audit Log -->
+                <button
+                  @click="handleMenuItem(onOpenAuditLog)"
+                  class="dropdown-item"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  {{ t('audit_log') }}
+                </button>
+
+                <!-- Divider -->
+                <div class="my-1 border-t border-gray-100 dark:border-gray-700"></div>
+
+                <!-- Logout -->
+                <button
+                  @click="handleMenuItem(onLogout)"
+                  class="dropdown-item text-red-500 dark:text-red-400"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  {{ t('logout') }}
+                </button>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -113,7 +159,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+
+const props = defineProps({
   isAdmin: { type: Boolean, required: true },
   isConnected: { type: Boolean, default: false },
   currentUser: { type: [Object, null], default: null },
@@ -129,4 +177,106 @@ defineProps({
   refreshStatus: { type: Function, required: true },
   t: { type: Function, required: true },
 })
+
+const showDropdown = ref(false)
+const dropdownRef = ref(null)
+
+function handleMenuItem(fn) {
+  showDropdown.value = false
+  fn()
+}
+
+function onClickOutside(e) {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target)) {
+    showDropdown.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside, true))
+onBeforeUnmount(() => document.removeEventListener('click', onClickOutside, true))
 </script>
+
+<style scoped>
+.hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid;
+  border-color: rgba(209, 213, 219, 0.7);
+  color: rgba(75, 85, 99, 1);
+  transition: all 0.15s;
+}
+.hdr-btn:hover {
+  background: rgba(243, 244, 246, 1);
+}
+:deep(.dark) .hdr-btn,
+.dark .hdr-btn {
+  border-color: rgba(55, 65, 81, 0.7);
+  color: rgba(209, 213, 219, 1);
+}
+:deep(.dark) .hdr-btn:hover,
+.dark .hdr-btn:hover {
+  background: rgba(31, 41, 55, 1);
+}
+
+.hdr-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid;
+  border-color: rgba(209, 213, 219, 0.7);
+  color: rgba(107, 114, 128, 1);
+  transition: all 0.15s;
+}
+.hdr-icon-btn:hover {
+  background: rgba(243, 244, 246, 1);
+}
+:deep(.dark) .hdr-icon-btn,
+.dark .hdr-icon-btn {
+  border-color: rgba(55, 65, 81, 0.7);
+  color: rgba(156, 163, 175, 1);
+}
+:deep(.dark) .hdr-icon-btn:hover,
+.dark .hdr-icon-btn:hover {
+  background: rgba(31, 41, 55, 1);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgba(55, 65, 81, 1);
+  transition: background 0.1s;
+  text-align: left;
+}
+.dropdown-item:hover {
+  background: rgba(243, 244, 246, 1);
+}
+:deep(.dark) .dropdown-item,
+.dark .dropdown-item {
+  color: rgba(209, 213, 219, 1);
+}
+:deep(.dark) .dropdown-item:hover,
+.dark .dropdown-item:hover {
+  background: rgba(31, 41, 55, 1);
+}
+.dropdown-item.text-red-500:hover,
+.dropdown-item.text-red-400:hover {
+  background: rgba(254, 242, 242, 1);
+}
+:deep(.dark) .dropdown-item.text-red-500:hover,
+:deep(.dark) .dropdown-item.text-red-400:hover,
+.dark .dropdown-item.text-red-500:hover,
+.dark .dropdown-item.text-red-400:hover {
+  background: rgba(127, 29, 29, 0.15);
+}
+</style>
