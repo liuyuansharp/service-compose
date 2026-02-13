@@ -25,8 +25,8 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "scheduled_restart": {
-        "enabled": true,
-        "cron": "03:00@0,1",
+        "enabled": false,
+        "cron": "",
         "last_restart": "2026-02-10T03:00:12.959573"
       },
       "depends_on": [

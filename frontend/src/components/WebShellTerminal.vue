@@ -2,7 +2,7 @@
   <!-- 最小化状态：底部浮动条 -->
   <div
     v-if="showTerminal && terminalMode === 'minimized'"
-    class="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-80 cursor-pointer select-none"
+    class="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 w-80 cursor-pointer select-none"
     @click="terminalMode = 'normal'"
   >
     <div class="bg-[#2d2d2d] border border-gray-600 border-b-0 rounded-t-lg px-4 py-2.5 flex items-center justify-between shadow-xl">

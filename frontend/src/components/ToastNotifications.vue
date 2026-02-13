@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       v-if="notification"
-      class="fixed bottom-4 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
+      class="fixed bottom-12 right-4 p-4 rounded-md border border-black/10 dark:border-white/10 text-white z-40 animate-slide-up"
       :class="notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'"
     >
       {{ notification.message }}
