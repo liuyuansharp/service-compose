@@ -97,7 +97,7 @@
           </button>
         </div>
       </div>
-      <div :ref="(el) => { if (terminalContainerRef) terminalContainerRef.value = el }" class="flex-1 overflow-hidden"></div>
+      <div id="xterm-container" class="flex-1 overflow-hidden"></div>
     </div>
   </div>
 </template>
@@ -108,7 +108,6 @@ const terminalMode = defineModel('terminalMode', { type: String, required: true 
 defineProps({
   showTerminal: { type: Boolean, required: true },
   terminalConnected: { type: Boolean, required: true },
-  terminalContainerRef: { type: Object, default: null },
   connectTerminal: { type: Function, required: true },
   closeTerminal: { type: Function, required: true },
   popoutTerminal: { type: Function, required: true },

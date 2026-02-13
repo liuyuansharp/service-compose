@@ -4,134 +4,154 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 
-export function useTerminal({ authToken, buildWsUrl, t, terminalContainer }) {
+export function useTerminal({ authToken, buildWsUrl, t }) {
   const showTerminal = ref(false)
   const terminalConnected = ref(false)
   const terminalMode = ref('normal') // 'normal' | 'minimized' | 'maximized'
   let termInstance = null
   let termFitAddon = null
   let termWs = null
+  let termResizeObserver = null
   let termPopoutWindow = null
+  let termContainer = null  // direct DOM reference
+
+  // ─── helpers ───
+
+  function safeFit() {
+    try { if (termFitAddon && termInstance) termFitAddon.fit() } catch (_) {}
+  }
+
+  function sendResize() {
+    if (termWs && termWs.readyState === WebSocket.OPEN && termInstance) {
+      termWs.send(JSON.stringify({ type: 'resize', cols: termInstance.cols, rows: termInstance.rows }))
+    }
+  }
+
+  function fitAndResize() {
+    safeFit()
+    sendResize()
+  }
+
+  // ─── websocket ───
 
   function connectTerminal() {
-    if (termWs) {
-      try { termWs.close() } catch (_) {}
-      termWs = null
-    }
-    if (!authToken.value) return
+    console.log('[Terminal] connectTerminal called, termInstance:', !!termInstance, 'authToken:', !!authToken.value)
+    if (termWs) { try { termWs.close() } catch (_) {} termWs = null }
+    if (!authToken.value) { console.warn('[Terminal] no authToken, aborting connect'); return }
+
     const wsUrl = buildWsUrl(`/api/ws/terminal?token=${encodeURIComponent(authToken.value)}`)
+    console.log('[Terminal] connecting to', wsUrl)
     termWs = new WebSocket(wsUrl)
+
     termWs.onopen = () => {
+      console.log('[Terminal] ws onopen, termInstance:', !!termInstance, 'termFitAddon:', !!termFitAddon)
       terminalConnected.value = true
-      if (termFitAddon && termInstance) {
-        termFitAddon.fit()
-        const dims = { type: 'resize', cols: termInstance.cols, rows: termInstance.rows }
-        termWs.send(JSON.stringify(dims))
-      }
+      fitAndResize()
     }
     termWs.onmessage = (e) => {
       if (termInstance) termInstance.write(e.data)
     }
-    termWs.onclose = () => {
+    termWs.onclose = (ev) => {
+      console.log('[Terminal] ws onclose, code:', ev.code, 'reason:', ev.reason)
       terminalConnected.value = false
     }
-    termWs.onerror = () => {
+    termWs.onerror = (ev) => {
+      console.error('[Terminal] ws onerror', ev)
       terminalConnected.value = false
     }
   }
 
-  function initTerminal() {
-    if (termInstance || !terminalContainer.value) return
+  // ─── xterm lifecycle ───
+
+  function destroyTermInstance() {
+    if (termResizeObserver) { termResizeObserver.disconnect(); termResizeObserver = null }
+    if (termInstance) { termInstance.dispose(); termInstance = null }
+    termFitAddon = null
+    termContainer = null
+  }
+
+  function openTerminal() {
+    const container = document.getElementById('xterm-container')
+    console.log('[Terminal] openTerminal called, container:', container)
+    if (!container) {
+      console.warn('[Terminal] openTerminal: container #xterm-container not found! Aborting.')
+      return
+    }
+    const rect = container.getBoundingClientRect()
+    console.log('[Terminal] container rect:', rect.width, 'x', rect.height)
+
+    // Tear down any previous instance (e.g. after close→reopen)
+    destroyTermInstance()
+    termContainer = container
+
     termInstance = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
       theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#d4d4d4',
-        selectionBackground: '#264f78',
-        black: '#1e1e1e',
-        red: '#f44747',
-        green: '#6a9955',
-        yellow: '#d7ba7d',
-        blue: '#569cd6',
-        magenta: '#c586c0',
-        cyan: '#4ec9b0',
-        white: '#d4d4d4',
+        background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4',
+        selectionBackground: '#264f78', black: '#1e1e1e', red: '#f44747',
+        green: '#6a9955', yellow: '#d7ba7d', blue: '#569cd6',
+        magenta: '#c586c0', cyan: '#4ec9b0', white: '#d4d4d4',
       },
       scrollback: 5000,
       allowProposedApi: true,
     })
+
     termFitAddon = new FitAddon()
     termInstance.loadAddon(termFitAddon)
     termInstance.loadAddon(new WebLinksAddon())
-    termInstance.open(terminalContainer.value)
-    termFitAddon.fit()
+
+    termInstance.open(container)
+    console.log('[Terminal] xterm opened in container, cols:', termInstance.cols, 'rows:', termInstance.rows)
 
     termInstance.onData((data) => {
-      if (termWs && termWs.readyState === WebSocket.OPEN) {
-        termWs.send(data)
-      }
+      if (termWs && termWs.readyState === WebSocket.OPEN) termWs.send(data)
     })
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (termFitAddon && showTerminal.value && terminalMode.value !== 'minimized') {
-        termFitAddon.fit()
-        if (termWs && termWs.readyState === WebSocket.OPEN && termInstance) {
-          termWs.send(JSON.stringify({ type: 'resize', cols: termInstance.cols, rows: termInstance.rows }))
-        }
-      }
+    termResizeObserver = new ResizeObserver(() => {
+      if (showTerminal.value && terminalMode.value !== 'minimized') fitAndResize()
     })
-    resizeObserver.observe(terminalContainer.value)
-    termInstance._resizeObserver = resizeObserver
+    termResizeObserver.observe(container)
 
-    connectTerminal()
+    // The ResizeObserver fires almost immediately when the container goes from
+    // display:none → visible, which triggers fit(). But as extra insurance do
+    // an explicit fit + connect after a rAF so the browser has flushed layout.
+    requestAnimationFrame(() => {
+      const rect2 = container.getBoundingClientRect()
+      console.log('[Terminal] rAF: container rect:', rect2.width, 'x', rect2.height)
+      safeFit()
+      console.log('[Terminal] rAF: after fit, cols:', termInstance?.cols, 'rows:', termInstance?.rows)
+      connectTerminal()
+      if (termInstance) termInstance.focus()
+    })
   }
 
   function refitTerminal() {
-    if (termFitAddon && termInstance) {
-      nextTick(() => {
-        termFitAddon.fit()
-        if (termWs && termWs.readyState === WebSocket.OPEN) {
-          termWs.send(JSON.stringify({ type: 'resize', cols: termInstance.cols, rows: termInstance.rows }))
-        }
-        termInstance.focus()
-      })
-    }
+    if (!termFitAddon || !termInstance) return
+    nextTick(() => requestAnimationFrame(() => {
+      fitAndResize()
+      if (termInstance) termInstance.focus()
+    }))
   }
 
   function closeTerminal() {
     showTerminal.value = false
     terminalMode.value = 'normal'
-    if (termWs) {
-      try { termWs.close() } catch (_) {}
-      termWs = null
-    }
-    if (termInstance) {
-      if (termInstance._resizeObserver) {
-        termInstance._resizeObserver.disconnect()
-      }
-      termInstance.dispose()
-      termInstance = null
-      termFitAddon = null
-    }
+    if (termWs) { try { termWs.close() } catch (_) {} termWs = null }
+    destroyTermInstance()
     terminalConnected.value = false
-    if (termPopoutWindow && !termPopoutWindow.closed) {
-      termPopoutWindow.close()
-    }
+    if (termPopoutWindow && !termPopoutWindow.closed) termPopoutWindow.close()
     termPopoutWindow = null
   }
 
+  // ─── popout ───
+
   function popoutTerminal() {
     if (!authToken.value) return
+    // Tear down in-page terminal
     if (termWs) { try { termWs.close() } catch (_) {} termWs = null }
-    if (termInstance) {
-      if (termInstance._resizeObserver) termInstance._resizeObserver.disconnect()
-      termInstance.dispose()
-      termInstance = null
-      termFitAddon = null
-    }
+    destroyTermInstance()
     terminalConnected.value = false
     showTerminal.value = false
     terminalMode.value = 'normal'
@@ -193,7 +213,7 @@ ${xtermCss}
         const ws = new WebSocket(wsUrl)
         ws.onopen = () => {
           fit.fit()
-          ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows }))
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
         }
         ws.onmessage = (e) => term.write(e.data)
         ws.onclose = () => { term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n') }
@@ -203,7 +223,7 @@ ${xtermCss}
         const ro = new popup.ResizeObserver(() => {
           fit.fit()
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows }))
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
           }
         })
         ro.observe(container)
@@ -218,15 +238,14 @@ ${xtermCss}
     setTimeout(setupPopupTerminal, 200)
   }
 
+  // ─── watchers ───
+
   watch(showTerminal, (val) => {
+    console.log('[Terminal] watch showTerminal:', val, 'mode:', terminalMode.value)
     if (val && terminalMode.value !== 'minimized') {
       nextTick(() => {
-        initTerminal()
-        // Always ensure a live websocket when opening terminal panel
-        connectTerminal()
-        nextTick(() => {
-          if (termInstance) termInstance.focus()
-        })
+        console.log('[Terminal] nextTick: about to openTerminal')
+        openTerminal()
       })
     }
   })
@@ -234,8 +253,7 @@ ${xtermCss}
   watch(terminalMode, (mode, oldMode) => {
     if (oldMode === 'minimized' && mode !== 'minimized') {
       nextTick(() => refitTerminal())
-    }
-    if (mode === 'normal' || mode === 'maximized') {
+    } else if (mode === 'normal' || mode === 'maximized') {
       nextTick(() => refitTerminal())
     }
   })
@@ -249,7 +267,7 @@ ${xtermCss}
     terminalConnected,
     terminalMode,
     connectTerminal,
-    initTerminal,
+    openTerminal,
     refitTerminal,
     closeTerminal,
     popoutTerminal,

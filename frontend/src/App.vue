@@ -217,7 +217,6 @@
       :show-terminal="showTerminal"
       v-model:terminal-mode="terminalMode"
       :terminal-connected="terminalConnected"
-      :terminal-container-ref="terminalContainer"
       :connect-terminal="connectTerminal"
       :close-terminal="closeTerminal"
       :popout-terminal="popoutTerminal"
@@ -358,7 +357,6 @@ const cpuChartRef = ref(null)
 const memoryChartRef = ref(null)
 const diskChartRef = ref(null)
 const trendChartRef = ref(null)
-const terminalContainer = ref(null)
 
 const { buildApiUrl, buildWsUrl, platformLinkUrl } = useApi()
 const { lang, t, langLabel, toggleLanguage } = useI18n()
@@ -557,11 +555,11 @@ const {
   terminalConnected,
   terminalMode,
   connectTerminal,
-  initTerminal,
+  openTerminal,
   refitTerminal,
   closeTerminal,
   popoutTerminal,
-} = useTerminal({ authToken, buildWsUrl, t, terminalContainer })
+} = useTerminal({ authToken, buildWsUrl, t })
 
 const {
   metricsService,
