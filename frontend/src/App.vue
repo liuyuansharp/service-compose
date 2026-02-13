@@ -67,6 +67,7 @@
               :open-cpu-cores="openCpuCores"
               :open-metrics-trend="openMetricsTrend"
               :open-disk-details="openDiskDetails"
+              :open-system-info="() => { showSystemInfo = true }"
               :t="t"
             />
 
@@ -290,6 +291,13 @@
       :on-close="() => { showPidTree = false }"
     />
 
+    <SystemInfoModal
+      :visible="showSystemInfo"
+      :authorized-fetch="authorizedFetch"
+      :t="t"
+      @close="showSystemInfo = false"
+    />
+
     <CustomConfirmDialog
       :confirm-dialog="confirmDialog"
       :batch-target-services="batchTargetServices"
@@ -310,6 +318,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import SystemMetricsTrendModal from './components/SystemMetricsTrendModal.vue'
+import SystemInfoModal from './components/SystemInfoModal.vue'
 import CustomConfirmDialog from './components/CustomConfirmDialog.vue'
 import ToastNotifications from './components/ToastNotifications.vue'
 import ProcessTreeModal from './components/ProcessTreeModal.vue'
@@ -473,6 +482,7 @@ const {
 } = useDashboard({ authorizedFetch, showNotification, t, servicesStatus, mergeServicesData })
 
 const selectedService = ref(null)
+const showSystemInfo = ref(false)
 
 const {
   logs,

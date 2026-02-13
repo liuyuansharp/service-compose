@@ -18,6 +18,128 @@ from .config import (
 from .models import ServiceStatus, SystemMetrics, DiskPartitionInfo, ServiceInfo
 
 
+# ---------- System Info (static hardware / OS details) ----------
+
+_system_info_cache = None
+_system_info_cache_time = 0
+
+
+def get_system_info() -> dict:
+    """Collect system hardware, OS and runtime info. Cached for 300s."""
+    import platform
+    import time as _time
+
+    global _system_info_cache, _system_info_cache_time
+    now = _time.time()
+    if _system_info_cache and now - _system_info_cache_time < 300:
+        return _system_info_cache
+
+    info = {}
+
+    # ── OS ──
+    uname = platform.uname()
+    info["hostname"] = uname.node
+    info["os"] = f"{uname.system} {uname.release}"
+    info["os_version"] = uname.version
+    info["arch"] = uname.machine
+
+    # Pretty name from /etc/os-release
+    try:
+        lines = Path("/etc/os-release").read_text().splitlines()
+        kv = {}
+        for line in lines:
+            if "=" in line:
+                k, v = line.split("=", 1)
+                kv[k.strip()] = v.strip().strip('"')
+        info["distro"] = kv.get("PRETTY_NAME", "")
+    except Exception:
+        info["distro"] = ""
+
+    # glibc
+    try:
+        info["glibc"] = " ".join(platform.libc_ver())
+    except Exception:
+        info["glibc"] = ""
+
+    # ── CPU ──
+    info["cpu_model"] = ""
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    info["cpu_model"] = line.split(":", 1)[1].strip()
+                    break
+    except Exception:
+        pass
+    info["cpu_cores_physical"] = psutil.cpu_count(logical=False) or 0
+    info["cpu_cores_logical"] = psutil.cpu_count(logical=True) or 0
+
+    # CPU frequency
+    try:
+        freq = psutil.cpu_freq()
+        if freq:
+            info["cpu_freq_mhz"] = round(freq.current, 0)
+            info["cpu_freq_max_mhz"] = round(freq.max, 0) if freq.max else 0
+        else:
+            info["cpu_freq_mhz"] = 0
+            info["cpu_freq_max_mhz"] = 0
+    except Exception:
+        info["cpu_freq_mhz"] = 0
+        info["cpu_freq_max_mhz"] = 0
+
+    # ── Memory ──
+    mem = psutil.virtual_memory()
+    info["memory_total_gb"] = round(mem.total / (1024 ** 3), 2)
+    swap = psutil.swap_memory()
+    info["swap_total_gb"] = round(swap.total / (1024 ** 3), 2)
+
+    # ── Boot / Uptime ──
+    try:
+        boot = psutil.boot_time()
+        info["boot_time"] = datetime.fromtimestamp(boot).isoformat()
+        uptime_s = int(now - boot)
+        days, rem = divmod(uptime_s, 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, _ = divmod(rem, 60)
+        info["uptime"] = f"{days}d {hours}h {minutes}m"
+    except Exception:
+        info["boot_time"] = ""
+        info["uptime"] = ""
+
+    # ── Python ──
+    info["python_version"] = platform.python_version()
+
+    # ── Kernel ──
+    info["kernel"] = uname.release
+
+    # ── Load average ──
+    try:
+        la = os.getloadavg()
+        info["load_avg"] = [round(v, 2) for v in la]
+    except Exception:
+        info["load_avg"] = []
+
+    # ── Network interfaces (primary IPs only) ──
+    try:
+        addrs = psutil.net_if_addrs()
+        nets = []
+        import socket
+        for iface, addr_list in addrs.items():
+            if iface == "lo":
+                continue
+            for addr in addr_list:
+                if addr.family == socket.AF_INET:
+                    nets.append({"interface": iface, "ip": addr.address})
+                    break
+        info["network"] = nets
+    except Exception:
+        info["network"] = []
+
+    _system_info_cache = info
+    _system_info_cache_time = now
+    return info
+
+
 # ---------- PID ----------
 
 def get_pid(pidfile: Path) -> Optional[int]:

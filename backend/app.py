@@ -47,7 +47,7 @@ from .models import (
 )
 from .services import (
     get_service_status, get_system_metrics, get_disk_partitions,
-    get_service_info, build_process_tree,
+    get_service_info, build_process_tree, get_system_info,
 )
 from .logs import (
     get_log_chain, read_chained_log_lines, rotate_log_if_needed,
@@ -886,6 +886,11 @@ async def metrics_sse(request: Request, service: str = Query(...), token: Option
 @app.get("/api/disks", response_model=List[DiskPartitionInfo])
 async def list_disks(current_user: dict = Depends(get_current_user)):
     return get_disk_partitions()
+
+
+@app.get("/api/system-info")
+async def system_info(current_user: dict = Depends(get_current_user)):
+    return get_system_info()
 
 
 @app.get("/api/process-tree")

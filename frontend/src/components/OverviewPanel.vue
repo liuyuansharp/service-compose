@@ -30,9 +30,9 @@
               ></span>
             </p>
           </div>
-          <div class="h-10 w-10 rounded-xl border border-blue-200/70 dark:border-blue-400/30 bg-blue-100/60 dark:bg-blue-500/10 flex items-center justify-center">
+          <div class="h-10 w-10 rounded-xl border border-blue-200/70 dark:border-blue-400/30 bg-blue-100/60 dark:bg-blue-500/10 flex items-center justify-center cursor-pointer hover:bg-blue-200/80 dark:hover:bg-blue-500/20 transition-colors" :title="t('sysinfo_title')" @click="openSystemInfo">
             <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 12h6l2-3 2 6 2-3h4" />
+              <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" />
             </svg>
           </div>
         </div>
@@ -259,6 +259,7 @@ defineProps({
   openCpuCores: { type: Function, required: true },
   openMetricsTrend: { type: Function, required: true },
   openDiskDetails: { type: Function, required: true },
+  openSystemInfo: { type: Function, required: true },
   t: { type: Function, required: true },
 })
 </script>
