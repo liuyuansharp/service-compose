@@ -505,10 +505,146 @@ def _stop_manager_daemon(pidfile: Path, logger: logging.Logger, timeout: int = 5
         logger.debug(f"Failed to stop manager daemon for {pidfile}: {e}")
 
 
+# ---------- Scheduled restart (cron-like) ----------
+
+def _parse_cron(cron_str: str):
+    """Parse cron string like 'HH:MM' or 'HH:MM@0,1,3' (weekdays 0=Mon..6=Sun)."""
+    if not cron_str:
+        return None
+    try:
+        parts = cron_str.split('@')
+        time_part = parts[0].strip()
+        h, m = int(time_part.split(':')[0]), int(time_part.split(':')[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            return None
+        weekdays = None
+        if len(parts) > 1 and parts[1].strip():
+            weekdays = [int(d) for d in parts[1].strip().split(',') if d.strip().isdigit()]
+            weekdays = [d for d in weekdays if 0 <= d <= 6]
+            if not weekdays:
+                weekdays = None
+        return {"hour": h, "minute": m, "weekdays": weekdays}
+    except Exception:
+        return None
+
+
+def _should_restart_now(sr: dict, now: datetime) -> bool:
+    """Check if scheduled restart should trigger at the given moment."""
+    parsed = _parse_cron(sr.get("cron", ""))
+    if not parsed:
+        return False
+    if now.hour != parsed["hour"] or now.minute != parsed["minute"]:
+        return False
+    weekdays = parsed.get("weekdays")
+    if weekdays is not None and now.weekday() not in weekdays:
+        return False
+    last = sr.get("last_restart")
+    if last:
+        try:
+            last_dt = datetime.fromisoformat(last)
+            if (now - last_dt).total_seconds() < 120:
+                return False
+        except Exception:
+            pass
+    return True
+
+
+def _append_audit_entry(audit_file: Path, entry: dict):
+    """Append an audit log entry (lightweight, no backend dependency)."""
+    try:
+        entries = []
+        if audit_file.exists():
+            try:
+                entries = json.loads(audit_file.read_text(encoding="utf-8"))
+            except Exception:
+                entries = []
+        entries.append(entry)
+        # keep last 5000 entries
+        if len(entries) > 5000:
+            entries = entries[-5000:]
+        audit_file.write_text(json.dumps(entries, ensure_ascii=False, indent=None), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _scheduled_restart_check(mgr: Manager):
+    """Single check: iterate services and restart those whose cron matches now."""
+    try:
+        config_path = mgr.config_path
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+    except Exception as e:
+        mgr.logger.warning(f"Scheduled restart: failed to load config: {e}")
+        return
+
+    now = datetime.now()
+    changed = False
+    audit_file = LOGS_DIR / 'audit.json'
+
+    for svc_cfg in config.get('services', []):
+        sr = svc_cfg.get('scheduled_restart')
+        if not sr or not sr.get("enabled") or not sr.get("cron"):
+            continue
+        svc_name = svc_cfg.get("name", "unknown")
+        if _should_restart_now(sr, now):
+            mgr.logger.info(f"Scheduled restart triggered for {svc_name}")
+            try:
+                svc = mgr.services_map.get(svc_name)
+                if svc:
+                    svc.stop()
+                    time.sleep(1)
+                    svc.start()
+                    mgr.logger.info(f"Scheduled restart completed for {svc_name}")
+                    _append_audit_entry(audit_file, {
+                        "timestamp": now.isoformat(),
+                        "user": "system", "role": "system",
+                        "action": "restart", "target": svc_name,
+                        "detail": "scheduled restart", "result": "success",
+                    })
+                else:
+                    mgr.logger.warning(f"Scheduled restart: service '{svc_name}' not found in manager")
+            except Exception as e:
+                mgr.logger.error(f"Scheduled restart failed for {svc_name}: {e}")
+                _append_audit_entry(audit_file, {
+                    "timestamp": now.isoformat(),
+                    "user": "system", "role": "system",
+                    "action": "restart", "target": svc_name,
+                    "detail": f"scheduled restart failed: {e}", "result": "failed",
+                })
+            sr["last_restart"] = now.isoformat()
+            changed = True
+
+    if changed:
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+        except Exception as e:
+            mgr.logger.warning(f"Scheduled restart: failed to save config: {e}")
+
+
+def _start_scheduled_restart_thread(mgr: Manager):
+    """Launch a daemon thread that checks scheduled restarts every 30 seconds."""
+    def _loop():
+        mgr.logger.info("Scheduled restart checker thread started")
+        while True:
+            time.sleep(30)
+            try:
+                _scheduled_restart_check(mgr)
+            except Exception as e:
+                mgr.logger.error(f"Scheduled restart check error: {e}")
+    t = threading.Thread(target=_loop, daemon=True, name="scheduled-restart")
+    t.start()
+    return t
+
+
 def run_monitor_forever(mgr: Manager, scope_label: str, pidfile: Path):
     """Keep the process alive so ServiceProcess watcher threads can perform auto-restart."""
     mgr.logger.info(f"Entering monitor loop (scope={scope_label})")
     _write_manager_pid(pidfile)
+    # Start scheduled restart checker only for full-scope monitors
+    if scope_label == 'all':
+        _start_scheduled_restart_thread(mgr)
     try:
         while True:
             time.sleep(1)
@@ -572,6 +708,8 @@ def main():
         if args.action == 'start':
             mgr.start_all()
             print(f"\nServices started. Check logs in: {LOGS_DIR}/")
+            # Start scheduled restart checker thread
+            _start_scheduled_restart_thread(mgr)
             # Keep running to monitor services
             try:
                 while True:

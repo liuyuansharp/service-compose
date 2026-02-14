@@ -53,7 +53,7 @@ from .logs import (
     get_log_chain, read_chained_log_lines, rotate_log_if_needed,
 )
 from .tasks import metrics_sampler, system_metrics_persist_loop, log_maintenance, load_system_metrics_history
-from .scheduled import scheduled_restart_loop, _parse_cron, _calc_next_restart
+from .scheduled import _parse_cron, _calc_next_restart
 from .audit import append_audit_log, read_audit_logs
 from .update import list_backups, rollback_to_backup, perform_update
 from .services import extract_log_level
@@ -66,7 +66,6 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(metrics_sampler())
     asyncio.create_task(system_metrics_persist_loop())
     asyncio.create_task(log_maintenance())
-    asyncio.create_task(scheduled_restart_loop())
     yield
 
 

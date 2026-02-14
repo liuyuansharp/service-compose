@@ -1,15 +1,16 @@
-"""Scheduled restart logic — cron parsing, checking, execution."""
+"""Scheduled restart helpers — cron parsing and next-restart calculation.
 
-import subprocess
-import sys
+The actual scheduled restart execution loop now lives in manage_services.py.
+This module only provides utility functions needed by the backend API to parse
+cron expressions and compute the next scheduled restart time for display.
+"""
+
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
-from .config import RUN_DIR, CONFIG_FILE, load_config, save_config, logger
-from .audit import append_audit_log
-
 
 def _parse_cron(cron_str: str) -> Optional[Dict]:
+    """Parse cron string like 'HH:MM' or 'HH:MM@0,1,3' (weekdays 0=Mon..6=Sun)."""
     if not cron_str:
         return None
     try:
@@ -30,6 +31,7 @@ def _parse_cron(cron_str: str) -> Optional[Dict]:
 
 
 def _calc_next_restart(sr_cfg: Dict) -> Optional[str]:
+    """Calculate the next scheduled restart ISO timestamp."""
     if not sr_cfg.get("enabled") or not sr_cfg.get("cron"):
         return None
     parsed = _parse_cron(sr_cfg["cron"])
@@ -46,59 +48,3 @@ def _calc_next_restart(sr_cfg: Dict) -> Optional[str]:
             continue
         return candidate.isoformat()
     return None
-
-
-def _should_restart_now(sr: Dict, now: datetime) -> bool:
-    parsed = _parse_cron(sr.get("cron", ""))
-    if not parsed:
-        return False
-    if now.hour != parsed["hour"] or now.minute != parsed["minute"]:
-        return False
-    weekdays = parsed.get("weekdays")
-    if weekdays is not None and now.weekday() not in weekdays:
-        return False
-    last = sr.get("last_restart")
-    if last:
-        try:
-            last_dt = datetime.fromisoformat(last)
-            if (now - last_dt).total_seconds() < 120:
-                return False
-        except Exception:
-            pass
-    return True
-
-
-def _do_scheduled_restart(service_name: str):
-    cmd = [f"{RUN_DIR}/manage_services", 'restart', "--config", f"{CONFIG_FILE}"
-           '--service', service_name, '--daemon']
-    try:
-        subprocess.Popen(cmd, cwd=str(RUN_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        append_audit_log(user="system", role="system", action="restart", target=service_name, detail="scheduled restart")
-    except Exception as e:
-        logger.error(f"Scheduled restart failed for {service_name}: {e}")
-        append_audit_log(user="system", role="system", action="restart", target=service_name, detail=f"scheduled restart failed: {e}", result="failed")
-
-
-async def scheduled_restart_loop():
-    """Background loop: every 30s check if any service needs scheduled restart."""
-    import asyncio
-    logger.info("Scheduled restart checker started")
-    while True:
-        await asyncio.sleep(30)
-        try:
-            config = load_config()
-            now = datetime.now()
-            changed = False
-            for svc in config.get('services', []):
-                sr = svc.get('scheduled_restart')
-                if sr and sr.get("enabled") and sr.get("cron"):
-                    if _should_restart_now(sr, now):
-                        svc_name = svc.get("name", "unknown")
-                        logger.info(f"Scheduled restart triggered for {svc_name}")
-                        _do_scheduled_restart(svc_name)
-                        sr["last_restart"] = now.isoformat()
-                        changed = True
-            if changed:
-                save_config(config)
-        except Exception as e:
-            logger.error(f"Scheduled restart check error: {e}")
