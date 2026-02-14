@@ -1,3 +1,9 @@
+[English](README.md) | [中文](README.zh-CN.md)
+
+---
+
+# ServiceCompose
+
 <p align="center">
   <img src="frontend/public/favicon.svg" width="80" height="80" alt="ServiceCompose Logo">
 </p>
@@ -5,7 +11,7 @@
 <h1 align="center">ServiceCompose</h1>
 
 <p align="center">
-  <strong>轻量级服务编排工具 —— CLI + WebUI 一体化管控</strong>
+  <strong>Lightweight Service Orchestration Tool — Unified CLI + WebUI Management</strong>
 </p>
 
 <p align="center">
@@ -17,31 +23,35 @@
 </p>
 
 <p align="center">
-  <a href="#-快速开始">快速开始</a> •
-  <a href="#-功能特性">功能特性</a> •
-  <a href="#-技术栈">技术栈</a> •
-  <a href="#-使用示例">使用示例</a> •
-  <a href="#-贡献指南">贡献指南</a>
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-examples">Examples</a> •
+  <a href="#-contributing">Contributing</a>
 </p>
 
 ---
 
-## 📖 简介
+# English version
 
-**ServiceCompose** 是一个轻量级的多服务编排与管控工具，通过一份 YAML 配置文件即可定义、启停和监控多个服务进程。它同时提供 **CLI 命令行** 和 **WebUI 仪表盘** 两种使用方式，适用于开发、测试和轻量生产环境中的服务编排场景。
+<!-- 以下为英文内容，原中文内容请见 README.zh-CN.md -->
 
-> *像 docker-compose 一样声明式地管理你的原生进程。*
+## 📖 Introduction
 
-## 🖼️ 截图预览
+**ServiceCompose** is a lightweight tool for orchestrating and managing multiple services. It allows you to define, start, stop, and monitor multiple service processes with a single YAML configuration file. It provides both **CLI** and **WebUI** interfaces, making it suitable for development, testing, and lightweight production environments.
+
+> *Manage your native processes declaratively, just like docker-compose.*
+
+## 🖼️ Preview
 
 <p align="center">
   <img src="doc/imgs/preview.gif" alt="ServiceCompose Dashboard Preview" width="960">
 </p>
 
 <details>
-<summary>📸 查看静态截图</summary>
+<summary>📸 View Static Screenshots</summary>
 
-| # | 截图 |
+| # | Screenshot |
 |---|------|
 | 1 | ![](doc/imgs/1.png) |
 | 2 | ![](doc/imgs/2.png) |
@@ -58,99 +68,99 @@
 </details>
 
 
-## ✨ 功能特性
+## ✨ Features
 
-### 🖥️ CLI 命令行
+### 🖥️ CLI
 
-- **声明式配置** — 使用 YAML 定义服务、启动命令、参数和依赖关系
-- **依赖拓扑排序** — 按依赖图自动确定启动 / 停止顺序，支持循环依赖检测
-- **进程守护** — 崩溃后自动重启，内置指数退避与重启风暴保护
-- **PID 管理** — 自动记录和清理 PID 文件
-- **滚动日志** — 每个服务独立日志文件，支持自动轮转
+- **Declarative Configuration** — Define services, commands, arguments, and dependencies using YAML
+- **Dependency Topology Sorting** — Automatically determine the start/stop order based on the dependency graph, with support for circular dependency detection
+- **Process Daemon** — Automatically restart on crash, with built-in exponential backoff and restart storm protection
+- **PID Management** — Automatically record and clean up PID files
+- **Rolling Logs** — Independent log files for each service, with automatic rotation
 
-### 🌐 WebUI 仪表盘
+### 🌐 WebUI
 
-- **实时监控** — CPU、内存、磁盘、网络 IO 实时指标，每核使用率详情
-- **服务控制** — 一键启动 / 停止 / 重启，支持批量操作
-- **实时日志** — WebSocket 推送日志流，支持级别筛选、关键字搜索、历史回溯
-- **依赖工作流** — 可视化服务依赖拓扑图（拓扑视图 + 力导向视图）
-- **进程树** — 查看服务的父子进程关系及各进程资源消耗
-- **系统指标趋势** — CPU / 内存使用率历史趋势图表，最长保留 30 天
-- **定时重启** — Cron 风格定时重启策略，支持按星期配置
-- **热更新 & 回滚** — 上传 `.tar.gz` 更新包在线升级，支持一键回滚至历史版本
-- **用户权限** — 多角色权限体系（管理员 / 操作员 / 只读），JWT 认证
-- **可见卡片** — 按用户配置仪表盘服务卡片可见性
-- **操作审计** — 完整记录所有用户操作历史
-- **Web 终端** — 内嵌 xterm.js 终端，在浏览器中直接操作服务器
-- **国际化** — 中文 / English 双语切换
-- **暗色模式** — 亮色 / 暗色主题自由切换
+- **Real-time Monitoring** — Real-time metrics for CPU, memory, disk, and network IO, with detailed per-core usage
+- **Service Control** — One-click start/stop/restart, with support for batch operations
+- **Real-time Logs** — WebSocket-pushed log streams, with level filtering, keyword search, and historical replay
+- **Dependency Workflows** — Visual service dependency topology (topology view + force-directed view)
+- **Process Tree** — View the parent-child process relationships of services and the resource consumption of each process
+- **System Metrics Trends** — Historical trend charts for CPU/memory usage, with up to 30 days of retention
+- **Scheduled Restart** — Cron-style scheduled restart policies, with support for weekly configuration
+- **Hot Update & Rollback** — Upload `.tar.gz` update packages for online upgrades, with one-click rollback to previous versions
+- **User Permissions** — Multi-role permission system (admin/operator/read-only), with JWT authentication
+- **Visible Cards** — Configure the visibility of dashboard service cards per user
+- **Operation Audit** — Complete record of all user operation histories
+- **Web Terminal** — Embedded xterm.js terminal, allowing direct server operations in the browser
+- **Internationalization** — Chinese/English bilingual switch
+- **Dark Mode** — Free switch between light and dark themes
 
-## 🏗️ 技术栈
+## 🏗️ Tech Stack
 
-| 层         | 技术                                                            |
-| ---------- | --------------------------------------------------------------- |
-| **后端**   | Python 3.9+, FastAPI, Uvicorn, SQLAlchemy, psutil, PyYAML       |
-| **前端**   | Vue 3, Vite, Tailwind CSS, ECharts, xterm.js                   |
-| **认证**   | JWT (python-jose), bcrypt (passlib)                             |
-| **通信**   | RESTful API + WebSocket                                         |
-| **构建**   | Cython 编译 (可选), Vite 打包, Shell 脚本一键构建               |
+| Layer       | Technology                                                        |
+| ----------- | --------------------------------------------------------------- |
+| **Backend** | Python 3.9+, FastAPI, Uvicorn, SQLAlchemy, psutil, PyYAML       |
+| **Frontend**| Vue 3, Vite, Tailwind CSS, ECharts, xterm.js                   |
+| **Authentication** | JWT (python-jose), bcrypt (passlib)                             |
+| **Communication** | RESTful API + WebSocket                                         |
+| **Build**   | Cython compilation (optional), Vite packaging, Shell script for one-click build               |
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 service-compose/
-├── backend/                  # 后端 Python 源码
-│   ├── app.py                # FastAPI 主入口 & API 路由
-│   ├── service_compose.py    # CLI 核心：进程管理 & 依赖编排
-│   ├── services.py           # 系统指标采集 & 心跳检测
-│   ├── auth.py               # JWT 认证 & 用户管理
-│   ├── config.py             # 全局配置 & 常量
-│   ├── models.py             # Pydantic 数据模型
-│   ├── logs.py               # 日志链式读取 & 轮转
-│   ├── tasks.py              # 后台定时任务
-│   ├── scheduled.py          # 定时重启解析
-│   ├── audit.py              # 操作审计日志
-│   └── update.py             # 热更新 & 回滚
-├── frontend/                 # 前端 Vue 3 源码
+├── backend/                  # Backend Python source code
+│   ├── app.py                # FastAPI main entry & API routes
+│   ├── service_compose.py    # CLI core: process management & dependency orchestration
+│   ├── services.py           # System metrics collection & heartbeat detection
+│   ├── auth.py               # JWT authentication & user management
+│   ├── config.py             # Global configuration & constants
+│   ├── models.py             # Pydantic data models
+│   ├── logs.py               # Log chain reading & rotation
+│   ├── tasks.py              # Background scheduled tasks
+│   ├── scheduled.py          # Scheduled restart parsing
+│   ├── audit.py              # Operation audit logs
+│   └── update.py             # Hot update & rollback
+├── frontend/                 # Frontend Vue 3 source code
 │   ├── src/
-│   │   ├── components/       # Vue 组件
-│   │   └── composables/      # 组合式函数 (hooks)
+│   │   ├── components/       # Vue components
+│   │   └── composables/      # Composable functions (hooks)
 │   └── package.json
 ├── examples/
-│   ├── services.yaml         # 示例配置文件
-│   └── dummy_service.sh      # 示例服务脚本
-├── build.sh                  # 一键构建打包脚本
-├── start_all.sh              # 一键启动 (服务 + API)
-├── stop_all.sh               # 一键停止
-├── requirements.txt          # Python 依赖
+│   ├── services.yaml         # Example configuration file
+│   └── dummy_service.sh      # Example service script
+├── build.sh                  # One-click build and package script
+├── start_all.sh              # One-click start (services + API)
+├── stop_all.sh               # One-click stop
+├── requirements.txt          # Python dependencies
 └── README.md
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 环境要求
+### Environment Requirements
 
 - Python 3.9+
-- Node.js 16+ (仅前端开发需要)
-- Linux 操作系统
+- Node.js 16+ (only required for frontend development)
+- Linux operating system
 
-### 1. 安装依赖
+### 1. Install Dependencies
 
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone https://github.com/liuyuansharp/service-compose.git
 cd service-compose
 
-# 安装 Python 依赖
+# Install Python dependencies
 pip install -r requirements.txt
 
-# 安装前端依赖 (可选，仅开发时需要)
+# Install frontend dependencies (optional, only needed during development)
 cd frontend && npm install && cd ..
 ```
 
-### 2. 编写配置文件
+### 2. Write Configuration File
 
-创建 `services.yaml`：
+Create `services.yaml`:
 
 ```yaml
 services:
@@ -183,113 +193,113 @@ services:
 run_dir: ./.services
 ```
 
-### 3. 使用 CLI 启动
+### 3. Start Using CLI
 
 ```bash
-# 启动所有服务（按依赖顺序）
+# Start all services (in dependency order)
 python3 -m backend.service_compose start --config services.yaml
 
-# 启动单个服务
+# Start a single service
 python3 -m backend.service_compose start --config services.yaml --service gateway
 
-# 查看状态
+# Check status
 python3 -m backend.service_compose status --config services.yaml
 
-# 停止所有服务（按反向依赖顺序）
+# Stop all services (in reverse dependency order)
 python3 -m backend.service_compose stop --config services.yaml
 
-# 重启单个服务（后台守护模式）
+# Restart a single service (in daemon mode)
 python3 -m backend.service_compose restart --config services.yaml --service user-service --daemon
 ```
 
-### 4. 使用 WebUI
+### 4. Use WebUI
 
 ```bash
-# 一键启动 (服务进程 + API 后端)
+# One-click start (service processes + API backend)
 ./start_all.sh services.yaml
 
-# 或手动启动后端 API
+# Or manually start the backend API
 python3 -m backend.app --config services.yaml --host 0.0.0.0 --port 8080
 
-# 开发模式启动前端
+# Start frontend in development mode
 cd frontend && npm run dev
 ```
 
-访问 `http://localhost:8080` 打开仪表盘（默认用户: `admin` / `admin`）。
+Visit `http://localhost:8080` to open the dashboard (default user: `admin` / `admin`).
 
-## 📝 使用示例
+## 📝 Examples
 
-### 快速体验 (示例服务)
+### Quick Experience (Example Service)
 
 ```bash
-# 使用自带的示例配置和脚本
+# Use the provided example configuration and script
 ./start_all.sh examples/services.yaml
 
-# 浏览器访问
-# 仪表盘: http://localhost:8080
-# API 文档: http://localhost:8080/api/docs
+# Browser access
+# Dashboard: http://localhost:8080
+# API Documentation: http://localhost:8080/api/docs
 
-# 停止
+# Stop
 ./stop_all.sh examples/services.yaml
 ```
 
-### 生产构建
+### Production Build
 
 ```bash
-# 完整构建（Cython 编译 + 前端打包 + tar.gz）
+# Full build (Cython compilation + frontend packaging + tar.gz)
 ./build.sh --version 1.2.0
 
-# 跳过前端编译
+# Skip frontend compilation
 ./build.sh --skip-frontend
 
-# 跳过 Cython 编译
+# Skip Cython compilation
 ./build.sh --skip-cython
 ```
 
-### 配置说明
+### Configuration Explanation
 
-| 字段                | 类型     | 说明                                          |
+| Field                | Type     | Description                                      |
 | ------------------- | -------- | --------------------------------------------- |
-| `name`              | string   | 服务名称（唯一标识）                          |
-| `cmd`               | string   | 启动命令（支持相对路径，相对于配置文件目录）   |
-| `args`              | string[] | 启动参数列表                                  |
-| `restart_on_exit`   | bool     | 进程退出后是否自动重启（指数退避）             |
-| `heartbeat`         | string   | 心跳检测 URL 或 `mock`                        |
-| `depends_on`        | string[] | 依赖的服务名列表（决定启停顺序）               |
-| `scheduled_restart` | object   | 定时重启配置                                  |
-| `run_dir`           | string   | 运行时目录（日志、PID 文件存放路径）           |
+| `name`              | string   | Service name (unique identifier)                |
+| `cmd`               | string   | Start command (supports relative paths, relative to the configuration file directory)   |
+| `args`              | string[] | List of start arguments                          |
+| `restart_on_exit`   | bool     | Whether to automatically restart the process after exit (exponential backoff)             |
+| `heartbeat`         | string   | Heartbeat detection URL or `mock`                |
+| `depends_on`        | string[] | List of service names that this service depends on (determines start/stop order)               |
+| `scheduled_restart` | object   | Scheduled restart configuration                  |
+| `run_dir`           | string   | Runtime directory (where logs and PID files are stored)           |
 
-### API 端点一览
+### API Endpoints Overview
 
-| 方法     | 路径                         | 说明            |
-| -------- | ---------------------------- | --------------- |
-| `POST`   | `/api/login`                 | 用户登录        |
-| `GET`    | `/api/status`                | 仪表盘状态      |
-| `POST`   | `/api/services/{name}/start` | 启动服务        |
-| `POST`   | `/api/services/{name}/stop`  | 停止服务        |
-| `POST`   | `/api/services/{name}/restart` | 重启服务      |
-| `GET`    | `/api/logs/{name}`           | 获取服务日志    |
-| `GET`    | `/api/metrics/{name}`        | 获取监控指标    |
-| `WS`     | `/api/ws/logs/{name}`        | 实时日志流      |
-| `WS`     | `/api/ws/terminal`           | Web 终端        |
-| `GET`    | `/api/docs`                  | Swagger API 文档 |
+| Method     | Path                         | Description            |
+| -------- | ---------------------------- | ------------- |
+| `POST`   | `/api/login`                 | User login        |
+| `GET`    | `/api/status`                | Dashboard status      |
+| `POST`   | `/api/services/{name}/start` | Start service        |
+| `POST`   | `/api/services/{name}/stop`  | Stop service        |
+| `POST`   | `/api/services/{name}/restart` | Restart service      |
+| `GET`    | `/api/logs/{name}`           | Get service logs    |
+| `GET`    | `/api/metrics/{name}`        | Get monitoring metrics    |
+| `WS`     | `/api/ws/logs/{name}`        | Real-time log stream      |
+| `WS`     | `/api/ws/terminal`           | Web terminal        |
+| `GET`    | `/api/docs`                  | Swagger API documentation |
 
-完整 API 文档请启动服务后访问 `/api/docs`。
+For the complete API documentation, please start the service and visit `/api/docs`.
 
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-欢迎提交 PR！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/awesome-feature`)
-3. 提交变更 (`git commit -m 'feat: add awesome feature'`)
-4. 推送分支 (`git push origin feature/awesome-feature`)
-5. 创建 Pull Request
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/awesome-feature`)
+3. Commit your changes (`git commit -m 'feat: add awesome feature'`)
+4. Push to the branch (`git push origin feature/awesome-feature`)
+5. Create a Pull Request
 
 ## 📄 License
 
-本项目使用 [MIT License](LICENSE) 开源。
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
