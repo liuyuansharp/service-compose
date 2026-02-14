@@ -7,8 +7,6 @@ services:
     args:
       - service_manager
       - "1000"
-    log: service_manager.log
-    pidfile: service_manager.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on: []
@@ -18,8 +16,6 @@ services:
     args:
       - service_A
       - "1000"
-    log: service_A.log
-    pidfile: service_A.pid
     restart_on_exit: true
     heartbeat: mock
     scheduled_restart:
@@ -34,8 +30,6 @@ services:
     args:
       - service_B
       - "1000"
-    log: service_B.log
-    pidfile: service_B.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -46,8 +40,6 @@ services:
     args:
       - service_C
       - "1000"
-    log: service_C.log
-    pidfile: service_C.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -58,8 +50,6 @@ services:
     args:
       - service_D
       - "1000"
-    log: service_D.log
-    pidfile: service_D.pid
     restart_on_exit: true
     heartbeat: mock
     scheduled_restart:
@@ -74,8 +64,6 @@ services:
     args:
       - service_E
       - "1000"
-    log: service_E.log
-    pidfile: service_E.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -86,8 +74,6 @@ services:
     args:
       - service_F
       - "1000"
-    log: service_F.log
-    pidfile: service_F.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -98,8 +84,6 @@ services:
     args:
       - service_G
       - "1000"
-    log: service_G.log
-    pidfile: service_G.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -110,8 +94,6 @@ services:
     args:
       - service_H
       - "1000"
-    log: service_H.log
-    pidfile: service_H.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:
@@ -122,8 +104,6 @@ services:
     args:
       - service_I
       - "1000"
-    log: service_I.log
-    pidfile: service_I.pid
     restart_on_exit: true
     heartbeat: mock
     depends_on:

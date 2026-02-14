@@ -123,12 +123,12 @@ class ServiceProcess:
     RESTART_DELAYS = [1, 2, 4, 8, 16, 32, 60]
     MAX_RESTART_ATTEMPTS_PER_MINUTE = 5  # Prevent restart storms
     
-    def __init__(self, name, cmd, args, log, pidfile, restart_on_exit=True):
+    def __init__(self, name, cmd, args, restart_on_exit=True):
         self.name = name
         self.cmd = cmd
         self.args = args or []
-        self.log_file = LOGS_DIR / log
-        self.pidfile = LOGS_DIR / pidfile
+        self.log_file = LOGS_DIR / f'{name}.log'
+        self.pidfile = LOGS_DIR / f'{name}.pid'
         self.restart_on_exit = restart_on_exit
         self.process = None
         self._stop_requested = threading.Event()
@@ -362,8 +362,6 @@ class Manager:
                 s.get('name'),
                 s['cmd'],
                 s.get('args', []),
-                s.get('log'),
-                s.get('pidfile'),
                 s.get('restart_on_exit', True)
             )
             self.services.append(sp)
