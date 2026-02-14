@@ -1,7 +1,14 @@
 #!/bin/bash
-
 set -euo pipefail
 
-source venv/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+cd "$SCRIPT_DIR"
 
-python3 -m backend.app --config /home/liuyuan/workspace/work/fsys/service/examples/services_config.json --host 0.0.0.0 --port 8080 
+# 激活虚拟环境（如果存在）
+if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
+    source "$SCRIPT_DIR/venv/bin/activate"
+fi
+
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+
+python3 -m backend.app --config "$CONFIG_FILE" --host 0.0.0.0 --port 8080
