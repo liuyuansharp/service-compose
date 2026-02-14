@@ -17,7 +17,7 @@ cd "$SCRIPT_DIR"
 
 VERSION="${VERSION:-1.0.0}"
 BUILD_DIR="$SCRIPT_DIR/build_dist"
-PACKAGE_NAME="services_flow"
+PACKAGE_NAME="service-compose"
 SKIP_FRONTEND=false
 SKIP_CYTHON=false
 
@@ -360,7 +360,7 @@ ln -sf "$RELEASE_DIR/service_compose" "$RELEASE_DIR/examples/.services/service_c
 cat > "$RELEASE_DIR/install.sh" << 'INSTALL_EOF'
 #!/bin/bash
 #
-# 安装脚本 - services_flow
+# 安装脚本 - service-compose
 # 使用打包好的依赖，无需联网安装
 #
 # 用法: ./install.sh --python /path/to/python3 [安装目录]
@@ -382,11 +382,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "参数:"
             echo "  --python, -p PATH  指定 python3 可执行文件路径（必需）"
-            echo "  安装目录            安装目标路径（默认: ./services_flow）"
+            echo "  安装目录            安装目标路径（默认: ./service-compose）"
             echo ""
             echo "示例:"
             echo "  $0 --python /usr/bin/python3"
-            echo "  $0 --python /opt/python3.9/bin/python3 /opt/services_flow"
+            echo "  $0 --python /opt/python3.9/bin/python3 /opt/service-compose"
             exit 0
             ;;
         -*)
@@ -396,8 +396,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# 默认安装到当前目录下的 services_flow
-INSTALL_DIR="${INSTALL_DIR:-$(pwd)/services_flow}"
+# 默认安装到当前目录下的 service-compose
+INSTALL_DIR="${INSTALL_DIR:-$(pwd)/service-compose}"
 
 log_info()  { echo -e "\033[32m[INFO]\033[0m  $*"; }
 log_warn()  { echo -e "\033[33m[WARN]\033[0m  $*"; }
@@ -421,7 +421,7 @@ PYTHON_VERSION=$("$PYTHON3" -c "import sys; print(f'{sys.version_info.major}.{sy
 log_info "使用 Python: $PYTHON3 (版本 $PYTHON_VERSION)"
 
 echo "=========================================="
-echo " services_flow 安装程序"
+echo " service-compose 安装程序"
 echo "=========================================="
 echo ""
 echo "Python 路径: $PYTHON3"
