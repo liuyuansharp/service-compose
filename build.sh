@@ -274,20 +274,17 @@ if [ "$SKIP_CYTHON" = false ]; then
 
     # __init__.py: 包初始化文件必须保留源码
     cp "$SCRIPT_DIR/backend/__init__.py" "$RELEASE_DIR/backend/__init__.py"
-
-    # app.py: FastAPI Depends() 与 Cython 不兼容，编译为 .pyc 字节码发布
-    # 直接放在 backend/app.pyc（非 __pycache__），python -m 可无源码加载
-    python3 -c "
+    "$PYTHON" -c "
 import py_compile
 py_compile.compile('$SCRIPT_DIR/backend/app.py', cfile='$RELEASE_DIR/backend/app.pyc', doraise=True)
 print('  编译 app.py -> backend/app.pyc')
 "
-    python3 -c "
+    "$PYTHON" -c "
 import py_compile
 py_compile.compile('$SCRIPT_DIR/backend/auth.py', cfile='$RELEASE_DIR/backend/auth.pyc', doraise=True)
 print('  编译 auth.py -> backend/auth.pyc')
 "
-    python3 -c "
+    "$PYTHON" -c "
 import py_compile
 py_compile.compile('$SCRIPT_DIR/backend/service_compose.py', cfile='$RELEASE_DIR/backend/service_compose.pyc', doraise=True)
 print('  编译 service_compose.py -> backend/service_compose.pyc')
