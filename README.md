@@ -278,3 +278,21 @@ cd frontend && npm run dev
 
 
 ## 🤝 贡献指南
+
+欢迎提交 PR！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/awesome-feature`)
+3. 提交变更 (`git commit -m 'feat: add awesome feature'`)
+4. 推送分支 (`git push origin feature/awesome-feature`)
+5. 创建 Pull Request
+
+## 📄 License
+
+本项目使用 [MIT License](LICENSE) 开源。
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/liuyuansharp">ServiceCompose Contributors</a>
+</p>
