@@ -70,13 +70,35 @@ log_info " $PACKAGE_NAME 打包脚本 v${VERSION}"
 log_info "=========================================="
 echo ""
 
-check_command python3
+
+# 检查/创建 venv，并统一用 venv/bin/python3
+VENV_DIR="$SCRIPT_DIR/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    log_warn "未找到 venv 目录: $VENV_DIR，自动创建并安装依赖..."
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+    pip install --upgrade pip
+    pip install -r "$SCRIPT_DIR/requirements.txt"
+    deactivate
+else
+    # 检查依赖是否已安装（简单判断：site-packages 下有无 fastapi）
+    if ! "$VENV_DIR/bin/python3" -c "import fastapi" 2>/dev/null; then
+        log_warn "检测到 venv 依赖不完整，自动安装 requirements.txt..."
+        source "$VENV_DIR/bin/activate"
+        pip install --upgrade pip
+        pip install -r "$SCRIPT_DIR/requirements.txt"
+        deactivate
+    fi
+fi
+
+PYTHON="$VENV_DIR/bin/python3"
+check_command "$PYTHON"
 
 if [ "$SKIP_CYTHON" = false ]; then
     # 检查 Cython 是否安装
-    if ! python3 -c "import Cython" 2>/dev/null; then
+    if ! "$PYTHON" -c "import Cython" 2>/dev/null; then
         log_warn "Cython 未安装，正在安装..."
-        pip3 install cython setuptools
+        "$VENV_DIR/bin/pip" install cython setuptools
     fi
     # 检查 gcc
     check_command gcc
@@ -103,12 +125,12 @@ if [ "$SKIP_CYTHON" = false ]; then
     # 解决 Anaconda compiler_compat 链接器与系统 libc 不兼容的问题
     # 强制使用系统 ld 而非 Anaconda 自带的旧版 ld
     export CC="gcc -pthread"
-    PYTHON_INCLUDE=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
+    PYTHON_INCLUDE=$("$PYTHON" -c "import sysconfig; print(sysconfig.get_path('include'))")
     export LDSHARED="gcc -pthread -shared -L/usr/lib/x86_64-linux-gnu"
     export LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
 
     # 在独立构建目录中编译，不污染源码目录
-    python3 "$SCRIPT_DIR/setup_cython.py" "$CYTHON_BUILD_DIR"
+    "$PYTHON" "$SCRIPT_DIR/setup_cython.py" "$CYTHON_BUILD_DIR"
 
     echo ""
     log_info "Cython 编译完成，生成的 .so 文件:"
@@ -143,17 +165,66 @@ else
 fi
 
 # ======================== 步骤 3: 打包 venv 依赖 ========================
-log_info "[步骤 3/5] 打包 Python 虚拟环境依赖..."
+# 找到 site-packages 目录（始终用 venv 下的 python3）
+SITE_PACKAGES=""
+if [ -x "$PYTHON" ]; then
+    SITE_PACKAGES=$("$PYTHON" -c "import site; print([p for p in site.getsitepackages() if 'site-packages' in p][0])" 2>/dev/null || true)
+fi
+if [ -z "$SITE_PACKAGES" ] || [ ! -d "$SITE_PACKAGES" ]; then
+    # fallback: 手动查找
+    SITE_PACKAGES=$(find "$VENV_DIR" -type d -name "site-packages" | head -1)
+fi
 
-VENV_DIR="$SCRIPT_DIR/venv"
-if [ ! -d "$VENV_DIR" ]; then
-    log_error "未找到 venv 目录: $VENV_DIR"
-    log_error "请先创建虚拟环境并安装依赖：python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+if [ -z "$SITE_PACKAGES" ] || [ ! -d "$SITE_PACKAGES" ]; then
+    log_error "未找到 site-packages 目录"
     exit 1
 fi
 
+log_info "site-packages 目录: $SITE_PACKAGES"
+
+    "$PYTHON" -c "
+import py_compile
+py_compile.compile('$SCRIPT_DIR/backend/app.py', cfile='$RELEASE_DIR/backend/app.pyc', doraise=True)
+print('  编译 app.py -> backend/app.pyc')
+"
+    "$PYTHON" -c "
+import py_compile
+py_compile.compile('$SCRIPT_DIR/backend/auth.py', cfile='$RELEASE_DIR/backend/auth.pyc', doraise=True)
+print('  编译 auth.py -> backend/auth.pyc')
+"
+    "$PYTHON" -c "
+import py_compile
+py_compile.compile('$SCRIPT_DIR/backend/service_compose.py', cfile='$RELEASE_DIR/backend/service_compose.pyc', doraise=True)
+print('  编译 service_compose.py -> backend/service_compose.pyc')
+"
+
+log_info "[步骤 3/5] 打包 Python 虚拟环境依赖..."
+VENV_DIR="$SCRIPT_DIR/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    log_warn "未找到 venv 目录: $VENV_DIR，自动创建并安装依赖..."
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+    pip install --upgrade pip
+    pip install -r "$SCRIPT_DIR/requirements.txt"
+    deactivate
+else
+    # 检查依赖是否已安装（简单判断：site-packages 下有无 fastapi）
+    if ! "$VENV_DIR/bin/python3" -c "import fastapi" 2>/dev/null; then
+        log_warn "检测到 venv 依赖不完整，自动安装 requirements.txt..."
+        source "$VENV_DIR/bin/activate"
+        pip install --upgrade pip
+        pip install -r "$SCRIPT_DIR/requirements.txt"
+        deactivate
+    fi
+fi
+
 # 找到 site-packages 目录
-SITE_PACKAGES=$(python3 -c "import site; print([p for p in site.getsitepackages() if 'site-packages' in p][0])" 2>/dev/null || true)
+
+# 始终用 venv 下的 python3 查找 site-packages，确保打包的是 venv 的依赖
+SITE_PACKAGES=""
+if [ -x "$VENV_DIR/bin/python3" ]; then
+    SITE_PACKAGES=$("$VENV_DIR/bin/python3" -c "import site; print([p for p in site.getsitepackages() if 'site-packages' in p][0])" 2>/dev/null || true)
+fi
 if [ -z "$SITE_PACKAGES" ] || [ ! -d "$SITE_PACKAGES" ]; then
     # fallback: 手动查找
     SITE_PACKAGES=$(find "$VENV_DIR" -type d -name "site-packages" | head -1)
