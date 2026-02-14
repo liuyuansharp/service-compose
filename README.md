@@ -215,7 +215,7 @@ python3 -m backend.app --config services.yaml --host 0.0.0.0 --port 8080
 cd frontend && npm run dev
 ```
 
-访问 `http://localhost:8080` 打开仪表盘（默认用户: `liuyuan` / `ly1234`）。
+访问 `http://localhost:8080` 打开仪表盘（默认用户: `admin` / `admin`）。
 
 ## 📝 使用示例
 

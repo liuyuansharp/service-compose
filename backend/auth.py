@@ -53,10 +53,10 @@ def init_auth_db():
     try:
         count = session.query(User).count()
         if count == 0:
-            default_password = os.getenv('DEFAULT_ADMIN_PASSWORD', 'ly1234')
-            session.add(User(username='liuyuan', password_hash=pwd_context.hash(default_password), role='admin'))
+            default_password = os.getenv('DEFAULT_ADMIN_PASSWORD', 'admin')
+            session.add(User(username='admin', password_hash=pwd_context.hash(default_password), role='admin'))
             session.commit()
-            logger.info("Created default admin user 'liuyuan'")
+            logger.info("Created default admin user 'admin'")
     finally:
         session.close()
 
