@@ -147,7 +147,7 @@ def main():
     ]
 
     setup(
-        name='services_flow',
+        name='service-compose',
         version='1.0.0',
         ext_modules=ext_modules,
         cmdclass={'build_ext': build_ext},

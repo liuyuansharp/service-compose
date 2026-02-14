@@ -1,16 +1,59 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#38BDF8"/>
-      <stop offset="1" stop-color="#6366F1"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E293B"/>
     </linearGradient>
+    <linearGradient id="wave" x1="6" y1="32" x2="58" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-sm">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect x="6" y="6" width="52" height="52" rx="14" fill="#E2E8F0"/>
-  <rect x="10" y="10" width="44" height="44" rx="12" fill="#F8FAFC" stroke="url(#core)" stroke-width="2"/>
-  <circle cx="32" cy="32" r="12" stroke="url(#core)" stroke-width="3"/>
-  <circle cx="32" cy="32" r="4" fill="url(#core)"/>
-  <path d="M32 16V8" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-  <path d="M48 32H56" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-  <path d="M32 48V56" stroke="#6366F1" stroke-width="2" stroke-linecap="round"/>
-  <path d="M8 32H16" stroke="#6366F1" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="14" fill="#F1F5F9"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" stroke="#E2E8F0" stroke-width="1" fill="none"/>
+
+  <!-- 网格背景线 -->
+  <g opacity="0.12" stroke="#94A3B8" stroke-width="0.5">
+    <line x1="8" y1="18" x2="56" y2="18"/>
+    <line x1="8" y1="26" x2="56" y2="26"/>
+    <line x1="8" y1="34" x2="56" y2="34"/>
+    <line x1="8" y1="42" x2="56" y2="42"/>
+    <line x1="8" y1="50" x2="56" y2="50"/>
+    <line x1="16" y1="12" x2="16" y2="54"/>
+    <line x1="26" y1="12" x2="26" y2="54"/>
+    <line x1="36" y1="12" x2="36" y2="54"/>
+    <line x1="46" y1="12" x2="46" y2="54"/>
+  </g>
+
+  <!-- 主心电图波形 (发光) -->
+  <g filter="url(#glow)">
+    <polyline
+      points="6,34 12,34 16,34 19,34 22,34 24,30 26,38 28,22 30,46 32,18 34,48 36,26 38,36 40,32 42,34 46,34 50,34 54,34 58,34"
+      stroke="url(#wave)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- 波形上的关键点 -->
+  <g filter="url(#glow-sm)">
+    <circle cx="32" cy="18" r="2.5" fill="#22D3EE" opacity="0.9">
+      <animate attributeName="r" values="2;3;2" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- 扫描线动画 -->
+  <rect x="0" y="12" width="3" height="44" rx="1.5" fill="#6366F1" opacity="0.06">
+    <animate attributeName="x" values="6;58;6" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.1;0" dur="4s" repeatCount="indefinite"/>
+  </rect>
 </svg>
