@@ -422,8 +422,6 @@ main()
 SCRIPT_EOF
 chmod +x "$RELEASE_DIR/service_compose"
 
-ln -sf "$RELEASE_DIR/service_compose" "$RELEASE_DIR/examples/.services/service_compose"
-
 # --- 安装脚本 ---
 cat > "$RELEASE_DIR/install.sh" << 'INSTALL_EOF'
 #!/bin/bash
