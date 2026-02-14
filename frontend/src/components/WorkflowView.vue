@@ -5,26 +5,6 @@
         <span v-if="!levels.length">{{ emptyLabel }}</span>
       </div>
       <div v-if="levels.length" class="flex items-center gap-1.5">
-        <div class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
-          <button
-            @click="viewMode = 'topo'"
-            class="px-2 py-1 text-xs rounded transition"
-            :class="viewMode === 'topo'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
-          >
-            {{ topoLabel }}
-          </button>
-          <button
-            @click="viewMode = 'force'"
-            class="px-2 py-1 text-xs rounded transition"
-            :class="viewMode === 'force'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
-          >
-            {{ forceLabel }}
-          </button>
-        </div>
         <button
           v-if="!isPopout"
           @click="$emit('popout')"
@@ -187,7 +167,7 @@
 
     <!-- Force-directed graph -->
     <div v-show="levels.length && viewMode === 'force'" class="relative">
-      <div ref="chartRef" class="workflow-force-chart"></div>
+      <div ref="chartRef" :class="isPopout ? 'workflow-force-chart-popout' : 'workflow-force-chart'"></div>
     </div>
   </div>
 </template>
@@ -204,14 +184,13 @@ const props = defineProps({
   emptyLabel: { type: String, default: '' },
   canOperate: { type: Boolean, default: false },
   controlling: { type: Boolean, default: false },
+  viewMode: { type: String, default: 'topo' },
   startLabel: { type: String, default: 'Start' },
   stopLabel: { type: String, default: 'Stop' },
   infoLabel: { type: String, default: 'Info' },
   metricsLabel: { type: String, default: 'Metrics' },
   logsLabel: { type: String, default: 'Logs' },
   uptimeLabel: { type: String, default: 'Uptime' },
-  topoLabel: { type: String, default: 'Topology' },
-  forceLabel: { type: String, default: 'Force' },
   popoutLabel: { type: String, default: 'Pop out' },
   pidTreeLabel: { type: String, default: 'PID Tree' },
   lastLogLabel: { type: String, default: 'Last Log' },
@@ -225,8 +204,6 @@ const props = defineProps({
 })
 
 defineEmits(['control', 'open-info', 'open-metrics', 'open-logs', 'open-pid-tree', 'popout'])
-
-const viewMode = ref('topo')
 
 const serviceMap = computed(() => {
   const m = new Map()
@@ -353,7 +330,7 @@ const calcConnectors = () => {
 }
 
 const scheduleCalc = () => {
-  if (viewMode.value === 'force') return
+  if (props.viewMode === 'force') return
   nextTick(() => {
     requestAnimationFrame(() => {
       requestAnimationFrame(calcConnectors)
@@ -378,7 +355,7 @@ onMounted(() => {
     const el = topoContainerRef.value
     if (el && typeof ResizeObserver !== 'undefined') {
       _resizeObserver = new ResizeObserver(() => {
-        if (viewMode.value !== 'force') {
+        if (props.viewMode !== 'force') {
           requestAnimationFrame(calcConnectors)
         }
       })
@@ -465,7 +442,7 @@ const buildForceFingerprint = () => {
 }
 
 const ensureChart = (forceRebuild = false) => {
-  if (!chartRef.value || viewMode.value !== 'force') return
+  if (!chartRef.value || props.viewMode !== 'force') return
 
   const fp = buildForceFingerprint()
   if (!forceRebuild && chartInstance && fp === _lastForceFingerprint) return
@@ -485,7 +462,7 @@ const resizeChart = () => {
   if (chartInstance) chartInstance.resize()
 }
 
-watch(viewMode, (mode) => {
+watch(() => props.viewMode, (mode) => {
   if (mode === 'force') {
     nextTick(() => {
       _lastForceFingerprint = '' // force rebuild on tab switch
@@ -503,14 +480,22 @@ watch(viewMode, (mode) => {
 })
 
 watch(() => [props.graph, props.services, props.dark], () => {
-  if (viewMode.value === 'force') {
-    nextTick(() => ensureChart(false))
+  if (props.viewMode === 'force') {
+    nextTick(() => {
+      ensureChart(false)
+      // After graph data arrives the container might just have become visible,
+      // so give the layout a frame to settle then resize.
+      requestAnimationFrame(() => resizeChart())
+    })
   }
 }, { deep: true })
 
 onMounted(() => {
-  if (viewMode.value === 'force') {
-    nextTick(() => ensureChart())
+  if (props.viewMode === 'force') {
+    nextTick(() => {
+      ensureChart()
+      requestAnimationFrame(() => resizeChart())
+    })
   }
   window.addEventListener('resize', resizeChart)
 })
@@ -534,5 +519,11 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 520px;
   height: 60vh;
+}
+
+.workflow-force-chart-popout {
+  width: 100%;
+  height: calc(100vh - 60px);
+  min-height: 400px;
 }
 </style>

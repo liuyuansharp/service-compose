@@ -12,29 +12,45 @@
         <div v-if="isAdmin" class="inline-flex items-center rounded-md border border-slate-200/60 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 p-0.5">
           <button
             @click="serviceViewMode = 'list'"
-            class="p-1.5 rounded transition"
+            class="p-1.5 text-xs rounded transition inline-flex items-center gap-1 view-switch-btn"
             :class="serviceViewMode === 'list'
-              ? 'bg-blue-600 text-white shadow-sm'
+              ? 'bg-blue-600 text-white shadow-sm active'
               : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
             :title="t('list_view')"
           >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
+            <span class="view-switch-label">{{ t('list_view') }}</span>
           </button>
           <button
-            @click="serviceViewMode = 'workflow'"
-            class="p-1.5 rounded transition"
-            :class="serviceViewMode === 'workflow'
-              ? 'bg-blue-600 text-white shadow-sm'
+            @click="serviceViewMode = 'topo'"
+            class="p-1.5 text-xs rounded transition inline-flex items-center gap-1 view-switch-btn"
+            :class="serviceViewMode === 'topo'
+              ? 'bg-blue-600 text-white shadow-sm active'
               : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
-            :title="t('workflow_view')"
+            :title="t('workflow_topo')"
           >
-            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="5" cy="12" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="19" cy="18" r="2" />
               <path d="M7 12h4l2-6h4" /><path d="M13 12l-2 6h4" />
             </svg>
+            <span class="view-switch-label">{{ t('workflow_topo') }}</span>
+          </button>
+          <button
+            @click="serviceViewMode = 'force'"
+            class="p-1.5 text-xs rounded transition inline-flex items-center gap-1 view-switch-btn"
+            :class="serviceViewMode === 'force'
+              ? 'bg-blue-600 text-white shadow-sm active'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-700/40'"
+            :title="t('workflow_force')"
+          >
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" /><circle cx="4" cy="6" r="2" /><circle cx="20" cy="6" r="2" /><circle cx="4" cy="18" r="2" /><circle cx="20" cy="18" r="2" />
+              <path d="M9.5 10L6 7.5" /><path d="M14.5 10L18 7.5" /><path d="M9.5 14L6 16.5" /><path d="M14.5 14L18 16.5" />
+            </svg>
+            <span class="view-switch-label">{{ t('workflow_force') }}</span>
           </button>
         </div>
 
@@ -190,7 +206,7 @@
       </div>
     </div>
 
-    <div v-show="serviceViewMode === 'workflow' || isPopoutMode" :class="isPopoutMode ? '' : 'mt-3'">
+    <div v-show="serviceViewMode === 'topo' || serviceViewMode === 'force' || isPopoutMode" :class="isPopoutMode ? '' : 'mt-3'">
       <WorkflowView
         :graph="serviceGraph"
         :services="visibleServices"
@@ -198,6 +214,7 @@
         :is-popout="isPopoutMode"
         :can-operate="canOperate"
         :controlling="controlling"
+        :view-mode="serviceViewMode === 'force' ? 'force' : 'topo'"
         :empty-label="serviceGraphLoading ? t('workflow_loading') : t('workflow_empty')"
         :start-label="t('start')"
         :stop-label="t('stop')"
@@ -205,8 +222,6 @@
         :metrics-label="t('metrics')"
         :logs-label="t('logs')"
         :uptime-label="t('uptime') || 'Uptime'"
-        :topo-label="t('workflow_topo')"
-        :force-label="t('workflow_force')"
         :popout-label="t('workflow_popout')"
         :pid-tree-label="t('pid_tree')"
         :last-log-label="t('last_log')"
@@ -269,3 +284,13 @@ defineProps({
   t: { type: Function, required: true },
 })
 </script>
+
+<style scoped>
+.view-switch-label {
+  display: none;
+  white-space: nowrap;
+}
+.view-switch-btn.active .view-switch-label {
+  display: inline;
+}
+</style>

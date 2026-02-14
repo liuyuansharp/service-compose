@@ -354,7 +354,7 @@ export function useServices({ authorizedFetch, showNotification, t, currentUser,
 
   const popoutWorkflow = () => {
     const url = new URL(window.location.href)
-    url.searchParams.set('view', 'workflow')
+    url.searchParams.set('view', serviceViewMode.value === 'force' ? 'force' : 'topo')
     const w = 1200, h = 820
     const left = (screen.width - w) / 2, top = (screen.height - h) / 2
     window.open(url.toString(), '_blank',
@@ -364,8 +364,9 @@ export function useServices({ authorizedFetch, showNotification, t, currentUser,
   const applyWorkflowViewFromUrl = () => {
     try {
       const params = new URLSearchParams(window.location.search)
-      if (params.get('view') === 'workflow') {
-        serviceViewMode.value = 'workflow'
+      const viewParam = params.get('view')
+      if (viewParam === 'topo' || viewParam === 'force') {
+        serviceViewMode.value = viewParam
         isPopoutMode.value = true
       }
     } catch (_) {}

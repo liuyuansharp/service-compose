@@ -1,14 +1,14 @@
 {
   "services": [
     {
-      "name": "service_platform",
+      "name": "service_manager",
       "cmd": "/home/liuyuan/workspace/work/fsys/service/examples/dummy_service.sh",
       "args": [
-        "service_platform",
+        "service_manager",
         "1000"
       ],
-      "log": "service_platform.log",
-      "pidfile": "service_platform.pid",
+      "log": "service_manager.log",
+      "pidfile": "service_manager.pid",
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": []
@@ -30,7 +30,7 @@
         "last_restart": "2026-02-10T03:00:12.959573"
       },
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -45,7 +45,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -60,7 +60,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -80,7 +80,7 @@
         "last_restart": null
       },
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -95,7 +95,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -110,7 +110,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -125,7 +125,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -140,7 +140,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     },
     {
@@ -155,7 +155,7 @@
       "restart_on_exit": true,
       "heartbeat": "mock",
       "depends_on": [
-        "service_platform"
+        "service_manager"
       ]
     }
   ],

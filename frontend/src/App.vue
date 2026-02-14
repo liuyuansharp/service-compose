@@ -746,7 +746,7 @@ watch(authToken, (token) => {
 })
 
 watch(serviceViewMode, (mode) => {
-  if (mode === 'workflow') {
+  if (mode === 'topo' || mode === 'force') {
     loadServiceGraph()
   }
 })
