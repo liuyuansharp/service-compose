@@ -14,8 +14,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent
-CONFIG_FILE = ROOT / 'services_config.json'
+CONFIG_FILE = ROOT / 'services.yaml'
 LOGS_DIR = ROOT / 'logs'
 
 def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=3):
@@ -104,6 +106,15 @@ def topological_sort(services: List[dict] = []) -> List[List[str]]:
         raise ValueError(f"Cyclic dependency detected among services: "
                          f"{[n for n in all_names if in_degree[n] > 0]}")
     return levels
+
+
+def _resolve_path(path_str: str, base_dir: Path) -> str:
+    """Resolve a path relative to base_dir if it's not absolute."""
+    p = Path(path_str)
+    if p.is_absolute():
+        return str(p)
+    return str((base_dir / p).resolve())
+
 
 class ServiceProcess:
     """Manages a single service process with auto-restart, logging, and pid tracking."""
@@ -316,21 +327,30 @@ class Manager:
         self.services_map = {}
 
     def _load_config(self):
-        """Load configuration from JSON file."""
+        """Load configuration from YAML file."""
         try:
             global CONFIG_FILE
             CONFIG_FILE = self.config_path
+            config_dir = self.config_path.resolve().parent
             with open(self.config_path) as f:
-                cfg = json.load(f)
+                cfg = yaml.safe_load(f) or {}
                 self.services_cfg = cfg.get('services', [])
-                self.run_dir = cfg.get('run_dir', None)
+                run_dir_raw = cfg.get('run_dir', None)
+            # resolve relative run_dir
+            if run_dir_raw:
+                self.run_dir = _resolve_path(run_dir_raw, config_dir)
             if self.run_dir:
                 global LOGS_DIR
                 LOGS_DIR = Path(self.run_dir) / "logs"
+            # resolve relative cmd paths in services
+            for svc in self.services_cfg:
+                if 'cmd' in svc:
+                    svc['cmd'] = _resolve_path(svc['cmd'], config_dir)
             self.logger = setup_logger('Manager', str(LOGS_DIR / 'manager.log'))
             self.logger.info(f"Loaded config from {self.config_path}")
         except Exception as e:
-            self.logger.error(f"Failed to load config: {e}")
+            if self.logger:
+                self.logger.error(f"Failed to load config: {e}")
             raise
 
     def setup(self):
@@ -572,7 +592,7 @@ def _scheduled_restart_check(mgr: Manager):
     try:
         config_path = mgr.config_path
         with open(config_path, 'r') as f:
-            config = json.load(f)
+            config = yaml.safe_load(f) or {}
     except Exception as e:
         mgr.logger.warning(f"Scheduled restart: failed to load config: {e}")
         return
@@ -617,8 +637,7 @@ def _scheduled_restart_check(mgr: Manager):
     if changed:
         try:
             with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-                f.write('\n')
+                yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         except Exception as e:
             mgr.logger.warning(f"Scheduled restart: failed to save config: {e}")
 

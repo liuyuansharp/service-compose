@@ -9,7 +9,7 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 echo "停止所有服务..."
 python3 -c "

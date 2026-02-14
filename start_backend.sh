@@ -9,6 +9,6 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 python3 -m backend.app --config "$CONFIG_FILE" --host 0.0.0.0 --port 8080

@@ -245,7 +245,7 @@ mkdir -p "$RELEASE_DIR/examples/.services/logs"
 cp -r "$SCRIPT_DIR/examples/"* "$RELEASE_DIR/examples/" 2>/dev/null || true
 
 # 将配置文件中的硬编码源码路径替换为占位符，安装时再替换为实际路径
-find "$RELEASE_DIR/examples" -name "*.json" -exec \
+find "$RELEASE_DIR/examples" \( -name "*.json" -o -name "*.yaml" \) -exec \
     sed -i "s|${SCRIPT_DIR}|__INSTALL_DIR__|g" {} \;
 
 # --- 依赖文件 ---
@@ -264,7 +264,7 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 python3 -m backend.app --config "$CONFIG_FILE" --host 0.0.0.0 --port 8080
 SCRIPT_EOF
@@ -282,7 +282,7 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 echo "启动服务管理器..."
 nohup python3 -c "
@@ -316,7 +316,7 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 echo "停止所有服务..."
 python3 -c "
@@ -449,7 +449,7 @@ done
 
 # 替换配置文件中的路径占位符为实际安装路径
 log_info "更新配置文件路径..."
-find "$INSTALL_DIR" -name "*.json" -exec \
+find "$INSTALL_DIR" \( -name "*.json" -o -name "*.yaml" \) -exec \
     sed -i "s|__INSTALL_DIR__|${INSTALL_DIR}|g" {} \;
 
 # 创建虚拟环境并安装打包好的依赖
@@ -492,7 +492,7 @@ echo "  启动后端:      $INSTALL_DIR/start_backend.sh [config_file]"
 echo "  停止所有服务:  $INSTALL_DIR/stop_all.sh [config_file]"
 echo "  服务管理:      $INSTALL_DIR/manage_services.sh {start|stop|status|restart}"
 echo ""
-echo "默认配置文件: $INSTALL_DIR/examples/services_config.json"
+echo "默认配置文件: $INSTALL_DIR/examples/services.yaml"
 echo "API 地址:     http://0.0.0.0:8080"
 echo "API 文档:     http://0.0.0.0:8080/api/docs"
 echo ""

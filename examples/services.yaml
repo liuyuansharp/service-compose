@@ -1,0 +1,132 @@
+# 服务配置文件
+# 支持相对路径：相对于本配置文件所在目录解析
+
+services:
+  - name: service_manager
+    cmd: ./dummy_service.sh
+    args:
+      - service_manager
+      - "1000"
+    log: service_manager.log
+    pidfile: service_manager.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on: []
+
+  - name: service_A
+    cmd: ./dummy_service.sh
+    args:
+      - service_A
+      - "1000"
+    log: service_A.log
+    pidfile: service_A.pid
+    restart_on_exit: true
+    heartbeat: mock
+    scheduled_restart:
+      enabled: false
+      cron: ""
+      last_restart: "2026-02-10T03:00:12.959573"
+    depends_on:
+      - service_manager
+
+  - name: service_B
+    cmd: ./dummy_service.sh
+    args:
+      - service_B
+      - "1000"
+    log: service_B.log
+    pidfile: service_B.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_C
+    cmd: ./dummy_service.sh
+    args:
+      - service_C
+      - "1000"
+    log: service_C.log
+    pidfile: service_C.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_D
+    cmd: ./dummy_service.sh
+    args:
+      - service_D
+      - "1000"
+    log: service_D.log
+    pidfile: service_D.pid
+    restart_on_exit: true
+    heartbeat: mock
+    scheduled_restart:
+      enabled: false
+      cron: ""
+      last_restart: null
+    depends_on:
+      - service_manager
+
+  - name: service_E
+    cmd: ./dummy_service.sh
+    args:
+      - service_E
+      - "1000"
+    log: service_E.log
+    pidfile: service_E.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_F
+    cmd: ./dummy_service.sh
+    args:
+      - service_F
+      - "1000"
+    log: service_F.log
+    pidfile: service_F.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_G
+    cmd: ./dummy_service.sh
+    args:
+      - service_G
+      - "1000"
+    log: service_G.log
+    pidfile: service_G.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_H
+    cmd: ./dummy_service.sh
+    args:
+      - service_H
+      - "1000"
+    log: service_H.log
+    pidfile: service_H.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+  - name: service_I
+    cmd: ./dummy_service.sh
+    args:
+      - service_I
+      - "1000"
+    log: service_I.log
+    pidfile: service_I.pid
+    restart_on_exit: true
+    heartbeat: mock
+    depends_on:
+      - service_manager
+
+run_dir: ./.services

@@ -9,7 +9,7 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services_config.json}"
+CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
 
 echo "启动服务管理器..."
 nohup python3 -c "

@@ -1,15 +1,16 @@
 """Shared constants, paths and configuration loaders."""
 
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Dict, List
 from collections import deque
 
+import yaml
+
 # ---------- Paths ----------
 RUN_DIR = Path(__file__).resolve().parent.parent          # project root
-CONFIG_FILE = RUN_DIR / 'services_config.json'
+CONFIG_FILE = RUN_DIR / 'services.yaml'
 LOGS_DIR = RUN_DIR / 'logs'
 AUTH_DB_PATH = RUN_DIR / 'auth.db'
 AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
@@ -54,19 +55,29 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('backend')
 
 # ---------- Config ----------
+def _resolve_path(path_str: str, base_dir: Path) -> str:
+    """Resolve a path relative to base_dir if it's not absolute."""
+    p = Path(path_str)
+    if p.is_absolute():
+        return str(p)
+    return str((base_dir / p).resolve())
+
+
 def update_run_dir(services_conifg_path):
     services_conifg = {}
+    config_dir = Path(services_conifg_path).resolve().parent
     try:
         with open(services_conifg_path, 'r') as f:
-            services_conifg = json.load(f)
+            services_conifg = yaml.safe_load(f) or {}
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
 
     if services_conifg:
-        run_dir = services_conifg.get("run_dir",None)
+        run_dir = services_conifg.get("run_dir", None)
         if run_dir:
+            resolved_run_dir = _resolve_path(run_dir, config_dir)
             global RUN_DIR, CONFIG_FILE, LOGS_DIR, AUTH_DB_PATH, AUDIT_LOG_FILE, SYSTEM_METRICS_FILE
-            RUN_DIR = Path(run_dir)
+            RUN_DIR = Path(resolved_run_dir)
             CONFIG_FILE = Path(services_conifg_path)
             LOGS_DIR = RUN_DIR / 'logs'
             AUTH_DB_PATH = RUN_DIR / 'auth.db'
@@ -76,20 +87,39 @@ def update_run_dir(services_conifg_path):
             logger.info(f"Updated run directory to: {RUN_DIR}")
 
 def load_config() -> dict:
-    """Load services configuration (unified format — only 'services' key)."""
+    """Load services configuration (unified format — only 'services' key).
+    
+    Returns raw config without resolving relative paths,
+    so that save_config can preserve original relative paths.
+    """
     try:
         with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            return yaml.safe_load(f) or {}
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
         return {}
 
 
+def load_config_resolved() -> dict:
+    """Load config with all relative paths resolved to absolute.
+    
+    Use this when you need actual executable paths (e.g., for running services).
+    Do NOT pass the result to save_config — it would overwrite relative paths.
+    """
+    cfg = load_config()
+    config_dir = CONFIG_FILE.resolve().parent
+    for svc in cfg.get('services', []):
+        if 'cmd' in svc:
+            svc['cmd'] = _resolve_path(svc['cmd'], config_dir)
+    if 'run_dir' in cfg and cfg['run_dir']:
+        cfg['run_dir'] = _resolve_path(cfg['run_dir'], config_dir)
+    return cfg
+
+
 def save_config(config: dict):
     """Write config back to CONFIG_FILE."""
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write('\n')
+        yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 def get_all_services(config: dict = None) -> List[dict]:
