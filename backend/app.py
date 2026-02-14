@@ -416,7 +416,7 @@ async def _get_service_lock(service_name: str) -> asyncio.Lock:
 
 async def _run_service_command(action: str, service: Optional[str], timeout: float = 30) -> dict:
     cmd = [
-        f"{RUN_DIR}/manage_services",
+        f"{RUN_DIR}/service_compose",
         action,
         f"--config",
         f"{CONFIG_FILE}"

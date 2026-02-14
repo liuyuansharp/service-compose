@@ -1,6 +1,6 @@
 """Scheduled restart helpers — cron parsing and next-restart calculation.
 
-The actual scheduled restart execution loop now lives in manage_services.py.
+The actual scheduled restart execution loop now lives in backend/service_compose.py.
 This module only provides utility functions needed by the backend API to parse
 cron expressions and compute the next scheduled restart time for display.
 """

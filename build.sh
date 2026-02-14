@@ -198,8 +198,8 @@ if [ "$SKIP_CYTHON" = false ]; then
     if [ -d "$CYTHON_BUILD_DIR/output/backend" ]; then
         cp "$CYTHON_BUILD_DIR/output/backend/"*.so "$RELEASE_DIR/backend/" 2>/dev/null || true
     fi
-    # 根目录的 .so（manage_services）
-    find "$CYTHON_BUILD_DIR/output" -maxdepth 1 -name "*.so" -exec cp {} "$RELEASE_DIR/" \;
+    # 根目录的 .so（service_compose 已移入 backend/）
+    # find "$CYTHON_BUILD_DIR/output" -maxdepth 1 -name "*.so" -exec cp {} "$RELEASE_DIR/" \;
 
     # __init__.py: 包初始化文件必须保留源码
     cp "$SCRIPT_DIR/backend/__init__.py" "$RELEASE_DIR/backend/__init__.py"
@@ -218,12 +218,11 @@ print('  编译 auth.py -> backend/auth.pyc')
 "
     python3 -c "
 import py_compile
-py_compile.compile('$SCRIPT_DIR/manage_services.py', cfile='$RELEASE_DIR/manage_services.pyc', doraise=True)
-print('  编译 manage_services.py -> manage_services.pyc')
+py_compile.compile('$SCRIPT_DIR/backend/service_compose.py', cfile='$RELEASE_DIR/backend/service_compose.pyc', doraise=True)
+print('  编译 service_compose.py -> backend/service_compose.pyc')
 "
 else
     # 不编译模式：直接拷贝 .py 文件
-    cp "$SCRIPT_DIR/manage_services.py" "$RELEASE_DIR/"
     cp "$SCRIPT_DIR/backend/"*.py "$RELEASE_DIR/backend/"
 fi
 
@@ -290,8 +289,8 @@ import importlib
 import os
 import sys
 sys.path.insert(0, os.path.abspath('$SCRIPT_DIR'))
-mod = importlib.import_module('manage_services')
-sys.argv = ['manage_services', 'start', '--config', '$CONFIG_FILE', '--daemon']
+mod = importlib.import_module('backend.service_compose')
+sys.argv = ['service_compose', 'start', '--config', '$CONFIG_FILE', '--daemon']
 mod.main()
 " &>/dev/null &
 
@@ -324,8 +323,8 @@ import importlib
 import os
 import sys
 sys.path.insert(0, os.path.abspath('$SCRIPT_DIR'))
-mod = importlib.import_module('manage_services')
-sys.argv = ['manage_services', 'stop', '--config', '$CONFIG_FILE']
+mod = importlib.import_module('backend.service_compose')
+sys.argv = ['service_compose', 'stop', '--config', '$CONFIG_FILE']
 mod.main()
 " 2>/dev/null || true
 
@@ -336,9 +335,9 @@ echo "所有服务已停止"
 SCRIPT_EOF
 chmod +x "$RELEASE_DIR/stop_all.sh"
 
-cat > "$RELEASE_DIR/manage_services.sh" << 'SCRIPT_EOF'
+cat > "$RELEASE_DIR/service_compose" << 'SCRIPT_EOF'
 #!/bin/bash
-# 服务管理命令封装（兼容 .so 编译模式）
+# service_compose — CLI entry point for backend.service_compose
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -346,22 +345,16 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-MANAGE_SERVICES_DIR="$SCRIPT_DIR" python3 - "$@" << 'PY'
-import importlib
-import os
-import sys
-
-script_dir = os.environ.get("MANAGE_SERVICES_DIR") or os.getcwd()
-sys.path.insert(0, script_dir)
-
-mod = importlib.import_module('manage_services')
-sys.argv = ['manage_services'] + sys.argv[1:]
-mod.main()
-PY
+SERVICE_COMPOSE_DIR="$SCRIPT_DIR" python3 -c "
+import sys, os
+sys.path.insert(0, os.environ.get('SERVICE_COMPOSE_DIR', os.getcwd()))
+from backend.service_compose import main
+main()
+" "$@"
 SCRIPT_EOF
-chmod +x "$RELEASE_DIR/manage_services.sh"
+chmod +x "$RELEASE_DIR/service_compose"
 
-ln -s "$RELEASE_DIR/manage_services.sh" "$RELEASE_DIR/examples/.services/manage_services"
+ln -sf "$RELEASE_DIR/service_compose" "$RELEASE_DIR/examples/.services/service_compose"
 
 # --- 安装脚本 ---
 cat > "$RELEASE_DIR/install.sh" << 'INSTALL_EOF'
@@ -490,7 +483,7 @@ echo "使用方法:"
 echo "  启动所有服务:  $INSTALL_DIR/start_all.sh [config_file]"
 echo "  启动后端:      $INSTALL_DIR/start_backend.sh [config_file]"
 echo "  停止所有服务:  $INSTALL_DIR/stop_all.sh [config_file]"
-echo "  服务管理:      $INSTALL_DIR/manage_services.sh {start|stop|status|restart}"
+echo "  服务管理:      $INSTALL_DIR/service_compose {start|stop|status|restart}"
 echo ""
 echo "默认配置文件: $INSTALL_DIR/examples/services.yaml"
 echo "API 地址:     http://0.0.0.0:8080"

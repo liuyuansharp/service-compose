@@ -16,7 +16,7 @@ from typing import Dict, List
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent          # backend/ -> project root
 CONFIG_FILE = ROOT / 'services.yaml'
 LOGS_DIR = ROOT / 'logs'
 

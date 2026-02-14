@@ -53,10 +53,10 @@ def collect_py_files():
         module_name = str(rel.with_suffix('')).replace('/', '.')
         py_files.append((str(py_file), module_name))
 
-    # # 收集根目录的 manage_services.py
-    # manage_file = ROOT_DIR / 'manage_services.py'
+    # # 收集根目录的 service_compose.py（已移入 backend/）
+    # manage_file = ROOT_DIR / 'backend' / 'service_compose.py'
     # if manage_file.exists():
-    #     py_files.append((str(manage_file), 'manage_services'))
+    #     py_files.append((str(manage_file), 'backend.service_compose'))
 
     return py_files
 

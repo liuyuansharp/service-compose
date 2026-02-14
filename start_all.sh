@@ -17,8 +17,8 @@ import importlib
 import os
 import sys
 sys.path.insert(0, os.path.abspath('$SCRIPT_DIR'))
-mod = importlib.import_module('manage_services')
-sys.argv = ['manage_services', 'start', '--config', '$CONFIG_FILE', '--daemon']
+mod = importlib.import_module('backend.service_compose')
+sys.argv = ['service_compose', 'start', '--config', '$CONFIG_FILE', '--daemon']
 mod.main()
 " &>/dev/null &
 

@@ -1,0 +1,18 @@
+#!/bin/bash
+# service_compose — CLI entry point for backend.service_compose
+# Usage: ./service_compose start|stop|restart|status [--service NAME] [--config PATH] [--daemon]
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# 激活虚拟环境（如果存在）
+if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
+    source "$SCRIPT_DIR/venv/bin/activate"
+fi
+
+SERVICE_COMPOSE_DIR="$SCRIPT_DIR" python3 -c "
+import sys, os
+sys.path.insert(0, os.environ.get('SERVICE_COMPOSE_DIR', os.getcwd()))
+from backend.service_compose import main
+main()
+" "$@"

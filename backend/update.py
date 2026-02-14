@@ -85,7 +85,7 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest: Path):
 def _run_restart(service: str):
     import sys
     import subprocess
-    cmd = [f"{RUN_DIR}/manage_services", 'restart', "--config", f"{CONFIG_FILE}",
+    cmd = [f"{RUN_DIR}/service_compose", 'restart', "--config", f"{CONFIG_FILE}",
            '--service', service, '--daemon']
     result = subprocess.run(cmd, cwd=str(RUN_DIR), capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
