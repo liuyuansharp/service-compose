@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import asyncio
@@ -415,26 +416,25 @@ async def _get_service_lock(service_name: str) -> asyncio.Lock:
 
 
 async def _run_service_command(action: str, service: Optional[str], timeout: float = 30) -> dict:
-    cmd = [
-        f"{RUN_DIR}/service_compose",
-        action,
-        f"--config",
-        f"{CONFIG_FILE}"
-    ]
+    argv = ['service_compose', action, '--config', str(CONFIG_FILE)]
     if service:
-        cmd.extend(['--service', service])
+        argv.extend(['--service', service])
         if action in ("start", "restart"):
-            cmd.append('--daemon')
+            argv.append('--daemon')
     else:
         if action in ("start", "restart"):
-            cmd.append('--daemon')
+            argv.append('--daemon')
 
-    is_daemon = "--daemon" in cmd
+    is_daemon = "--daemon" in argv
+
+    # 项目安装根目录（backend 包的父目录），作为 cwd 让 -m 能找到包
+    project_root = str(Path(__file__).resolve().parent.parent)
+    cmd = [sys.executable, "-m", "backend.service_compose"] + argv[1:]
 
     if is_daemon:
         await asyncio.create_subprocess_exec(
             *cmd,
-            cwd=str(RUN_DIR),
+            cwd=project_root,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -443,7 +443,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
             "action": action,
             "service": service or "all",
             "message": f"Successfully executed '{action}'",
-            "command": " ".join(cmd),
+            "command": " ".join(argv),
             "output": "",
             "stderr": "",
             "daemon": True,
@@ -451,7 +451,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=str(RUN_DIR),
+        cwd=project_root,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -473,7 +473,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
         "action": action,
         "service": service or "all",
         "message": f"Successfully executed '{action}'",
-        "command": " ".join(cmd),
+        "command": " ".join(argv),
         "output": stdout_str,
         "stderr": stderr_str,
         "daemon": False,

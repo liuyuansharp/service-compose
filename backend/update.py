@@ -85,9 +85,11 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest: Path):
 def _run_restart(service: str):
     import sys
     import subprocess
-    cmd = [f"{RUN_DIR}/service_compose", 'restart', "--config", f"{CONFIG_FILE}",
-           '--service', service, '--daemon']
-    result = subprocess.run(cmd, cwd=str(RUN_DIR), capture_output=True, text=True, timeout=60)
+    argv = ['service_compose', 'restart', '--config', str(CONFIG_FILE),
+            '--service', service, '--daemon']
+    project_root = str(Path(__file__).resolve().parent.parent)
+    cmd = [sys.executable, "-m", "backend.service_compose"] + argv[1:]
+    result = subprocess.run(cmd, cwd=project_root, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise RuntimeError(result.stderr or result.stdout or 'Restart failed')
 
