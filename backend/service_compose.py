@@ -18,6 +18,16 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent          # backend/ -> project root
 CONFIG_FILE = ROOT / 'services.yaml'
+
+
+def _load_file(path: Path) -> dict:
+    """Load config from YAML or JSON based on file extension."""
+    suffix = path.suffix.lower()
+    with open(path, 'r', encoding='utf-8') as f:
+        if suffix == '.json':
+            return json.load(f) or {}
+        else:
+            return yaml.safe_load(f) or {}
 LOGS_DIR = ROOT / 'logs'
 
 def setup_logger(name, log_file, max_bytes=10*1024*1024, backup_count=3):
@@ -327,15 +337,14 @@ class Manager:
         self.services_map = {}
 
     def _load_config(self):
-        """Load configuration from YAML file."""
+        """Load configuration from YAML or JSON file."""
         try:
             global CONFIG_FILE
             CONFIG_FILE = self.config_path
             config_dir = self.config_path.resolve().parent
-            with open(self.config_path) as f:
-                cfg = yaml.safe_load(f) or {}
-                self.services_cfg = cfg.get('services', [])
-                run_dir_raw = cfg.get('run_dir', None)
+            cfg = _load_file(self.config_path)
+            self.services_cfg = cfg.get('services', [])
+            run_dir_raw = cfg.get('run_dir', None)
             # resolve relative run_dir
             if run_dir_raw:
                 self.run_dir = _resolve_path(run_dir_raw, config_dir)

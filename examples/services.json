@@ -1,0 +1,29 @@
+{
+  "services": [
+    {
+      "name": "service_manager",
+      "cmd": "./dummy_service.sh",
+      "args": ["service_manager", "1000"],
+      "restart_on_exit": true,
+      "heartbeat": "mock",
+      "depends_on": []
+    },
+    {
+      "name": "service_A",
+      "cmd": "./dummy_service.sh",
+      "args": ["service_A", "1000"],
+      "restart_on_exit": true,
+      "heartbeat": "mock",
+      "depends_on": ["service_manager"]
+    },
+    {
+      "name": "service_B",
+      "cmd": "./dummy_service.sh",
+      "args": ["service_B", "1000"],
+      "restart_on_exit": true,
+      "heartbeat": "mock",
+      "depends_on": ["service_manager"]
+    }
+  ],
+  "run_dir": "./.services"
+}

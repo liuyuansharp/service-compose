@@ -1,5 +1,6 @@
 """Shared constants, paths and configuration loaders."""
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -11,6 +12,39 @@ import yaml
 # ---------- Paths ----------
 RUN_DIR = Path(__file__).resolve().parent.parent          # project root
 CONFIG_FILE = RUN_DIR / 'services.yaml'
+
+
+def _detect_config_file(base_dir: Path) -> Path:
+    """Auto-detect config file: prefer .yaml, fallback to .json."""
+    yaml_path = base_dir / 'services.yaml'
+    json_path = base_dir / 'services.json'
+    if yaml_path.exists():
+        return yaml_path
+    if json_path.exists():
+        return json_path
+    return yaml_path  # default
+
+
+def _load_file(path: Path) -> dict:
+    """Load config from YAML or JSON based on file extension."""
+    suffix = path.suffix.lower()
+    with open(path, 'r', encoding='utf-8') as f:
+        if suffix == '.json':
+            return json.load(f) or {}
+        else:
+            return yaml.safe_load(f) or {}
+
+
+def _save_file(path: Path, data: dict):
+    """Save config to YAML or JSON based on file extension."""
+    suffix = path.suffix.lower()
+    with open(path, 'w', encoding='utf-8') as f:
+        if suffix == '.json':
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        else:
+            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
 LOGS_DIR = RUN_DIR / 'logs'
 AUTH_DB_PATH = RUN_DIR / 'auth.db'
 AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
@@ -67,8 +101,7 @@ def update_run_dir(services_conifg_path):
     services_conifg = {}
     config_dir = Path(services_conifg_path).resolve().parent
     try:
-        with open(services_conifg_path, 'r') as f:
-            services_conifg = yaml.safe_load(f) or {}
+        services_conifg = _load_file(Path(services_conifg_path))
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
 
@@ -89,12 +122,12 @@ def update_run_dir(services_conifg_path):
 def load_config() -> dict:
     """Load services configuration (unified format — only 'services' key).
     
+    Supports both YAML (.yaml/.yml) and JSON (.json) formats.
     Returns raw config without resolving relative paths,
     so that save_config can preserve original relative paths.
     """
     try:
-        with open(CONFIG_FILE, 'r') as f:
-            return yaml.safe_load(f) or {}
+        return _load_file(CONFIG_FILE)
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
         return {}
@@ -117,9 +150,8 @@ def load_config_resolved() -> dict:
 
 
 def save_config(config: dict):
-    """Write config back to CONFIG_FILE."""
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    """Write config back to CONFIG_FILE (auto-detect YAML/JSON by extension)."""
+    _save_file(CONFIG_FILE, config)
 
 
 def get_all_services(config: dict = None) -> List[dict]:

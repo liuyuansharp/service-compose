@@ -318,8 +318,23 @@ find "$RELEASE_DIR/examples" \( -name "*.json" -o -name "*.yaml" \) -exec \
 # --- 依赖文件 ---
 cp "$SCRIPT_DIR/requirements.txt" "$RELEASE_DIR/"
 
+# --- .env 配置文件 ---
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    cp "$SCRIPT_DIR/.env" "$RELEASE_DIR/.env"
+else
+    cat > "$RELEASE_DIR/.env" << 'ENV_EOF'
+# service-compose 环境配置
+# 后端 API 监听地址
+HOST=0.0.0.0
+# 后端 API 监听端口
+PORT=8080
+# 服务配置文件路径（支持 .yaml 和 .json）
+CONFIG_FILE=examples/services.yaml
+ENV_EOF
+fi
+
 # --- 启动脚本（生成适配编译后的启动脚本） ---
-cat > "$RELEASE_DIR/start_backend.sh" << 'SCRIPT_EOF'
+cat > "$RELEASE_DIR/start.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 
@@ -331,25 +346,32 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
-
-python3 -m backend.app --config "$CONFIG_FILE" --host 0.0.0.0 --port 8080
-SCRIPT_EOF
-chmod +x "$RELEASE_DIR/start_backend.sh"
-
-cat > "$RELEASE_DIR/start_all.sh" << 'SCRIPT_EOF'
-#!/bin/bash
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-cd "$SCRIPT_DIR"
-
-# 激活虚拟环境（如果存在）
-if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
-    source "$SCRIPT_DIR/venv/bin/activate"
+# 读取 .env 配置
+ENV_FILE="$SCRIPT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    source "$ENV_FILE"
+    set +a
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
+HOST="${HOST:-0.0.0.0}"
+PORT="${PORT:-8080}"
+
+# 自动检测配置文件：命令行参数 > .env > 自动检测 yaml/json
+if [ -n "${1:-}" ]; then
+    CONFIG_FILE="$1"
+elif [ -z "${CONFIG_FILE:-}" ]; then
+    if [ -f "$SCRIPT_DIR/examples/services.yaml" ]; then
+        CONFIG_FILE="$SCRIPT_DIR/examples/services.yaml"
+    elif [ -f "$SCRIPT_DIR/examples/services.json" ]; then
+        CONFIG_FILE="$SCRIPT_DIR/examples/services.json"
+    else
+        echo "错误：未找到 services.yaml 或 services.json 配置文件"
+        exit 1
+    fi
+fi
+
+[[ "$CONFIG_FILE" != /* ]] && CONFIG_FILE="$SCRIPT_DIR/$CONFIG_FILE"
 
 echo "启动服务管理器..."
 nohup python3 -c "
@@ -363,15 +385,15 @@ mod.main()
 " &>/dev/null &
 
 echo "启动后端 API..."
-nohup python3 -m backend.app --config "$CONFIG_FILE" --host 0.0.0.0 --port 8080 &>/dev/null &
+nohup python3 -m backend.app --config "$CONFIG_FILE" --host "$HOST" --port "$PORT" &>/dev/null &
 
 echo "所有服务已启动"
-echo "  API 地址: http://0.0.0.0:8080"
-echo "  API 文档: http://0.0.0.0:8080/api/docs"
+echo "  API 地址: http://${HOST}:${PORT}"
+echo "  API 文档: http://${HOST}:${PORT}/api/docs"
 SCRIPT_EOF
-chmod +x "$RELEASE_DIR/start_all.sh"
+chmod +x "$RELEASE_DIR/start.sh"
 
-cat > "$RELEASE_DIR/stop_all.sh" << 'SCRIPT_EOF'
+cat > "$RELEASE_DIR/stop.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
 
@@ -383,7 +405,29 @@ if [ -f "$SCRIPT_DIR/venv/bin/activate" ]; then
     source "$SCRIPT_DIR/venv/bin/activate"
 fi
 
-CONFIG_FILE="${1:-$SCRIPT_DIR/examples/services.yaml}"
+# 读取 .env 配置
+ENV_FILE="$SCRIPT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    source "$ENV_FILE"
+    set +a
+fi
+
+# 自动检测配置文件：命令行参数 > .env > 自动检测 yaml/json
+if [ -n "${1:-}" ]; then
+    CONFIG_FILE="$1"
+elif [ -z "${CONFIG_FILE:-}" ]; then
+    if [ -f "$SCRIPT_DIR/examples/services.yaml" ]; then
+        CONFIG_FILE="$SCRIPT_DIR/examples/services.yaml"
+    elif [ -f "$SCRIPT_DIR/examples/services.json" ]; then
+        CONFIG_FILE="$SCRIPT_DIR/examples/services.json"
+    else
+        echo "错误：未找到 services.yaml 或 services.json 配置文件"
+        exit 1
+    fi
+fi
+
+[[ "$CONFIG_FILE" != /* ]] && CONFIG_FILE="$SCRIPT_DIR/$CONFIG_FILE"
 
 echo "停止所有服务..."
 python3 -c "
@@ -401,7 +445,7 @@ pkill -f "backend.app" 2>/dev/null || true
 
 echo "所有服务已停止"
 SCRIPT_EOF
-chmod +x "$RELEASE_DIR/stop_all.sh"
+chmod +x "$RELEASE_DIR/stop.sh"
 
 cat > "$RELEASE_DIR/service_compose" << 'SCRIPT_EOF'
 #!/bin/bash
@@ -546,9 +590,8 @@ log_info " 安装完成！"
 log_info "=========================================="
 echo ""
 echo "使用方法:"
-echo "  启动所有服务:  $INSTALL_DIR/start_all.sh [config_file]"
-echo "  启动后端:      $INSTALL_DIR/start_backend.sh [config_file]"
-echo "  停止所有服务:  $INSTALL_DIR/stop_all.sh [config_file]"
+echo "  启动所有服务:  $INSTALL_DIR/start.sh [config_file]"
+echo "  停止所有服务:  $INSTALL_DIR/stop.sh [config_file]"
 echo "  服务管理:      $INSTALL_DIR/service_compose {start|stop|status|restart}"
 echo ""
 echo "默认配置文件: $INSTALL_DIR/examples/services.yaml"

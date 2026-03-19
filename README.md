@@ -130,8 +130,9 @@ service-compose/
 │   ├── services.yaml         # Example configuration file
 │   └── dummy_service.sh      # Example service script
 ├── build.sh                  # One-click build and package script
-├── start_all.sh              # One-click start (services + API)
-├── stop_all.sh               # One-click stop
+├── start.sh                  # One-click start (services + API)
+├── stop.sh                   # One-click stop
+├── .env                      # Environment config (HOST, PORT, CONFIG_FILE)
 ├── requirements.txt          # Python dependencies
 └── README.md
 ```
@@ -216,7 +217,7 @@ python3 -m backend.service_compose restart --config services.yaml --service user
 
 ```bash
 # One-click start (service processes + API backend)
-./start_all.sh services.yaml
+./start.sh services.yaml
 
 # Or manually start the backend API
 python3 -m backend.app --config services.yaml --host 0.0.0.0 --port 8080
@@ -233,14 +234,14 @@ Visit `http://localhost:8080` to open the dashboard (default user: `admin` / `ad
 
 ```bash
 # Use the provided example configuration and script
-./start_all.sh examples/services.yaml
+./start.sh examples/services.yaml
 
 # Browser access
 # Dashboard: http://localhost:8080
 # API Documentation: http://localhost:8080/api/docs
 
 # Stop
-./stop_all.sh examples/services.yaml
+./stop.sh examples/services.yaml
 ```
 
 ### Production Build

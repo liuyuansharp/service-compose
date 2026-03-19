@@ -126,8 +126,9 @@ service-compose/
 │   ├── services.yaml         # 示例配置文件
 │   └── dummy_service.sh      # 示例服务脚本
 ├── build.sh                  # 一键构建打包脚本
-├── start_all.sh              # 一键启动 (服务 + API)
-├── stop_all.sh               # 一键停止
+├── start.sh                  # 一键启动 (服务 + API)
+├── stop.sh                   # 一键停止
+├── .env                      # 环境配置 (HOST, PORT, CONFIG_FILE)
 ├── requirements.txt          # Python 依赖
 └── README.md
 ```
@@ -212,7 +213,7 @@ python3 -m backend.service_compose restart --config services.yaml --service user
 
 ```bash
 # 一键启动 (服务进程 + API 后端)
-./start_all.sh services.yaml
+./start.sh services.yaml
 
 # 或手动启动后端 API
 python3 -m backend.app --config services.yaml --host 0.0.0.0 --port 8080
@@ -229,14 +230,14 @@ cd frontend && npm run dev
 
 ```bash
 # 使用自带的示例配置和脚本
-./start_all.sh examples/services.yaml
+./start.sh examples/services.yaml
 
 # 浏览器访问
 # 仪表盘: http://localhost:8080
 # API 文档: http://localhost:8080/api/docs
 
 # 停止
-./stop_all.sh examples/services.yaml
+./stop.sh examples/services.yaml
 ```
 
 ### 生产构建

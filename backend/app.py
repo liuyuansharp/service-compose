@@ -1312,11 +1312,29 @@ if __name__ == "__main__":
     import socket
     import uvicorn
 
+    # 读取 .env 文件
+    PROJECT_ROOT_ENV = Path(__file__).resolve().parent.parent
+    _env_file = PROJECT_ROOT_ENV / '.env'
+    _env = {}
+    if _env_file.exists():
+        with open(_env_file, 'r', encoding='utf-8') as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if not _line or _line.startswith('#'):
+                    continue
+                if '=' in _line:
+                    _k, _v = _line.split('=', 1)
+                    _env[_k.strip()] = _v.strip()
+
+    _default_host = _env.get('HOST', '0.0.0.0')
+    _default_port = int(_env.get('PORT', '8080'))
+    _default_config = _env.get('CONFIG_FILE', '')
+
     parser = argparse.ArgumentParser(description="Service Manager Dashboard API")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
+    parser.add_argument("--host", default=_default_host, help="Host to bind to")
+    parser.add_argument("--port", type=int, default=_default_port, help="Port to bind to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    parser.add_argument("--config", type=str, default="", help="Services Config")
+    parser.add_argument("--config", type=str, default=_default_config, help="Services Config")
     args = parser.parse_args()
     
     from pathlib import Path
