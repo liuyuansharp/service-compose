@@ -613,6 +613,7 @@ log_info "[步骤 5/5] 打包为安装包..."
 cd "$BUILD_DIR"
 TARBALL="${RELEASE_NAME}-linux-$(uname -m).tar.gz"
 tar czf "$TARBALL" "$RELEASE_NAME"
+rm "$RELEASE_NAME" -rf
 
 TARBALL_PATH="$BUILD_DIR/$TARBALL"
 TARBALL_SIZE=$(du -h "$TARBALL_PATH" | cut -f1)
