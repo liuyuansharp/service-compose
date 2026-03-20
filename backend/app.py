@@ -437,6 +437,7 @@ async def _run_service_command(action: str, service: Optional[str], timeout: flo
             cwd=project_root,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,  # isolate daemon in its own process group
         )
         return {
             "status": "success",

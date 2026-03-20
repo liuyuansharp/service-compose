@@ -48,4 +48,7 @@ mod.main()
 # 停止后端 API 进程
 pkill -f "backend.app" 2>/dev/null || true
 
+# 停止残留的 service_compose daemon 进程
+pkill -f "backend.service_compose" 2>/dev/null || true
+
 echo "所有服务已停止"

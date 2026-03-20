@@ -16,6 +16,12 @@ from typing import Dict, List
 
 import yaml
 
+try:
+    import psutil
+    _HAS_PSUTIL = True
+except ImportError:
+    _HAS_PSUTIL = False
+
 ROOT = Path(__file__).resolve().parent.parent          # backend/ -> project root
 CONFIG_FILE = ROOT / 'services.yaml'
 
@@ -200,12 +206,174 @@ class ServiceProcess:
         except Exception as e:
             self.logger.error(f"Failed to remove pidfile: {e}")
 
+    def _read_pid_from_file(self):
+        """Read PID from pidfile. Returns int or None."""
+        try:
+            if self.pidfile.exists():
+                pid_str = self.pidfile.read_text().strip()
+                if pid_str.isdigit():
+                    return int(pid_str)
+        except Exception as e:
+            self.logger.debug(f"Failed to read pidfile: {e}")
+        return None
+
+    def _kill_pid(self, pid, timeout=10):
+        """Kill a process and ALL its descendants (entire process tree), best-effort.
+
+        Uses psutil to walk the full child tree so that grandchild processes
+        (e.g. uvicorn workers spawned by a shell wrapper) are also terminated.
+        Falls back to process-group kill when psutil is unavailable.
+
+        Returns True if the process tree was successfully terminated.
+        """
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            self.logger.debug(f"PID {pid} does not exist")
+            return True
+        except PermissionError:
+            self.logger.warning(f"No permission to signal PID {pid}")
+            return False
+
+        self.logger.info(f"Killing process tree rooted at PID {pid}")
+
+        # ---- Collect the full process tree via psutil ----
+        all_pids = set()
+        if _HAS_PSUTIL:
+            try:
+                parent = psutil.Process(pid)
+                # children(recursive=True) returns all descendants
+                descendants = parent.children(recursive=True)
+                all_pids = {p.pid for p in descendants}
+                all_pids.add(pid)
+                self.logger.debug(
+                    f"Process tree for PID {pid}: {sorted(all_pids)} "
+                    f"({len(all_pids)} processes)"
+                )
+            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                self.logger.debug(f"psutil tree walk failed: {e}, falling back to pgid")
+                all_pids = {pid}
+        else:
+            all_pids = {pid}
+
+        # ---- Phase 1: SIGTERM to process group + every known PID ----
+        # Kill the process group (covers children that stayed in the group)
+        try:
+            pgid = os.getpgid(pid)
+            my_pgid = os.getpgid(os.getpid())
+            if pgid != my_pgid:
+                os.killpg(pgid, signal.SIGTERM)
+                self.logger.debug(f"Sent SIGTERM to process group {pgid}")
+            else:
+                self.logger.debug(f"PID {pid} shares our pgid, skipping killpg")
+        except Exception as e:
+            self.logger.debug(f"killpg SIGTERM failed: {e}")
+
+        # Also SIGTERM each descendant individually (covers processes that
+        # may have changed their own process group)
+        for cpid in all_pids:
+            try:
+                os.kill(cpid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+        # ---- Phase 2: wait for all to exit ----
+        start_t = time.time()
+        while time.time() - start_t < timeout:
+            alive = set()
+            for cpid in all_pids:
+                try:
+                    os.kill(cpid, 0)
+                    alive.add(cpid)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            if not alive:
+                self.logger.info(
+                    f"Process tree (root {pid}, {len(all_pids)} procs) "
+                    f"terminated gracefully"
+                )
+                return True
+            time.sleep(0.3)
+
+        # ---- Phase 3: SIGKILL survivors ----
+        # Re-collect tree in case new children were spawned during grace period
+        if _HAS_PSUTIL:
+            try:
+                parent = psutil.Process(pid)
+                for ch in parent.children(recursive=True):
+                    all_pids.add(ch.pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+        alive_pids = set()
+        for cpid in all_pids:
+            try:
+                os.kill(cpid, 0)
+                alive_pids.add(cpid)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+        if alive_pids:
+            self.logger.warning(
+                f"PIDs still alive after {timeout}s: {sorted(alive_pids)}, "
+                f"sending SIGKILL"
+            )
+            # killpg SIGKILL
+            try:
+                pgid = os.getpgid(pid)
+                my_pgid = os.getpgid(os.getpid())
+                if pgid != my_pgid:
+                    os.killpg(pgid, signal.SIGKILL)
+            except Exception:
+                pass
+            # Also SIGKILL each individually
+            for cpid in alive_pids:
+                try:
+                    os.kill(cpid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+
+        # ---- Final check ----
+        time.sleep(0.5)
+        still_alive = []
+        for cpid in all_pids:
+            try:
+                os.kill(cpid, 0)
+                still_alive.append(cpid)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+        if still_alive:
+            self.logger.error(
+                f"PIDs still alive after SIGKILL: {still_alive}"
+            )
+            return False
+
+        self.logger.info(f"Process tree (root {pid}) fully killed")
+        return True
+
     def start(self):
         """Start the service process."""
         with self._lock:
             if self.process and self.process.poll() is None:
                 self.logger.info(f"Already running (pid={self.process.pid})")
                 return
+
+            # Check for residual process from pidfile (e.g. from a previous manager instance)
+            old_pid = self._read_pid_from_file()
+            if old_pid:
+                try:
+                    os.kill(old_pid, 0)
+                    # Process exists — kill it before starting a new one
+                    self.logger.warning(
+                        f"Found residual process PID {old_pid} from pidfile, killing before start"
+                    )
+                    self._kill_pid(old_pid)
+                except ProcessLookupError:
+                    self.logger.debug(f"Stale pidfile (PID {old_pid} not running), cleaning up")
+                except PermissionError:
+                    self.logger.warning(f"Residual PID {old_pid} exists but no permission to check/kill")
+                self._remove_pidfile()
 
             LOGS_DIR.mkdir(exist_ok=True)
             cmd = [self.cmd] + self.args
@@ -237,8 +405,19 @@ class ServiceProcess:
             self._stop_requested.set()
             
             if not self.process:
-                self._remove_pidfile()
-                self.logger.info("Not running, nothing to stop")
+                # No in-memory process handle — try to recover PID from pidfile
+                old_pid = self._read_pid_from_file()
+                if old_pid:
+                    self.logger.info(
+                        f"No in-memory process handle, but found PID {old_pid} in pidfile. "
+                        f"Attempting to kill residual process."
+                    )
+                    self._kill_pid(old_pid, timeout=timeout)
+                    self._remove_pidfile()
+                    self.logger.info("Residual process stopped via pidfile")
+                else:
+                    self._remove_pidfile()
+                    self.logger.info("Not running, nothing to stop")
                 return
             
             if self.process.poll() is not None:
@@ -249,25 +428,16 @@ class ServiceProcess:
             self.logger.info(f"Stopping (pid={self.process.pid}), timeout={timeout}s")
             
             try:
-                # Terminate the whole process group
-                try:
-                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                    self.logger.debug("Sent SIGTERM to process group")
-                except Exception as e:
-                    self.logger.debug(f"Failed to kill process group: {e}, trying single process")
-                    self.process.terminate()
+                # Kill the entire process tree (shell script + all children)
+                self._kill_pid(self.process.pid, timeout=timeout)
                 
+                # Ensure the Popen object is reaped to avoid zombies
                 try:
-                    self.process.wait(timeout=timeout)
-                    self.logger.info("Process terminated gracefully")
-                except subprocess.TimeoutExpired:
-                    self.logger.warning(f"Process did not exit after {timeout}s, killing")
-                    try:
-                        os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
-                    except Exception:
-                        self.process.kill()
-                    self.process.wait()
-                    self.logger.info("Process killed")
+                    self.process.wait(timeout=2)
+                except Exception:
+                    pass
+                
+                self.logger.info("Process tree stopped")
             except Exception as e:
                 self.logger.error(f"Error stopping: {e}")
             finally:
@@ -409,6 +579,14 @@ class Manager:
         self.logger.info("Stopping all services")
         self.logger.info("=" * 60)
 
+        # First, stop all per-service daemon managers to prevent auto-restart
+        # while we are killing service processes
+        for svc in self.services:
+            daemon_pidfile = LOGS_DIR / f'manager-{svc.name}.pid'
+            if daemon_pidfile.exists():
+                self.logger.info(f"Stopping daemon manager for {svc.name}")
+                _stop_manager_daemon(daemon_pidfile, self.logger)
+
         levels = self._get_start_levels()
         # Stop in reverse dependency order
         for idx, level in enumerate(reversed(levels)):
@@ -488,7 +666,11 @@ def _remove_manager_pid(pidfile: Path):
 
 
 def _stop_manager_daemon(pidfile: Path, logger: logging.Logger, timeout: int = 5):
-    """Stop a daemonized manager process recorded in pidfile (best-effort)."""
+    """Stop a daemonized manager process recorded in pidfile (best-effort).
+
+    Sends SIGTERM to the manager's process group so its watcher threads
+    cannot auto-restart services after the manager exits.
+    """
     try:
         if not pidfile.exists():
             return
@@ -502,13 +684,36 @@ def _stop_manager_daemon(pidfile: Path, logger: logging.Logger, timeout: int = 5
         if pid == os.getpid():
             return
 
-        logger.info(f"Stopping manager daemon pid={pid} (pidfile={pidfile})")
+        # Check if process still exists
         try:
-            os.kill(pid, signal.SIGTERM)
+            os.kill(pid, 0)
         except ProcessLookupError:
             logger.info("Manager daemon already exited")
             _remove_manager_pid(pidfile)
             return
+
+        logger.info(f"Stopping manager daemon pid={pid} (pidfile={pidfile})")
+
+        # Try to SIGTERM the entire process group first,
+        # but ONLY if it's not our own process group (safety check)
+        try:
+            pgid = os.getpgid(pid)
+            my_pgid = os.getpgid(os.getpid())
+            if pgid != my_pgid:
+                os.killpg(pgid, signal.SIGTERM)
+                logger.debug(f"Sent SIGTERM to manager daemon process group {pgid}")
+            else:
+                # Same process group — only kill the specific PID to avoid self-kill
+                logger.debug(f"Manager daemon {pid} shares our process group, sending SIGTERM to PID only")
+                os.kill(pid, signal.SIGTERM)
+        except Exception as e:
+            logger.debug(f"Failed to kill manager daemon process group: {e}, trying single process")
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                logger.info("Manager daemon already exited")
+                _remove_manager_pid(pidfile)
+                return
 
         # Wait a bit for it to exit
         start = time.time()
@@ -523,7 +728,15 @@ def _stop_manager_daemon(pidfile: Path, logger: logging.Logger, timeout: int = 5
         try:
             os.kill(pid, 0)
             logger.warning("Manager daemon did not exit, sending SIGKILL")
-            os.kill(pid, signal.SIGKILL)
+            try:
+                pgid = os.getpgid(pid)
+                my_pgid = os.getpgid(os.getpid())
+                if pgid != my_pgid:
+                    os.killpg(pgid, signal.SIGKILL)
+                else:
+                    os.kill(pid, signal.SIGKILL)
+            except Exception:
+                os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         finally:
@@ -716,15 +929,20 @@ def main():
 
         if args.service:
             if args.action == 'start':
+                # Stop old daemon manager first to prevent it from interfering
+                _stop_manager_daemon(LOGS_DIR / f'manager-{args.service}.pid', mgr.logger)
                 mgr.start_service(args.service)
                 if args.daemon:
                     run_monitor_forever(mgr, f'service:{args.service}', LOGS_DIR / f'manager-{args.service}.pid')
             elif args.action == 'stop':
-                # stop service itself
-                mgr.stop_service(args.service)
-                # also stop daemonized service manager if exists
+                # IMPORTANT: stop daemon manager FIRST to prevent its watcher
+                # from auto-restarting the service after we kill it
                 _stop_manager_daemon(LOGS_DIR / f'manager-{args.service}.pid', mgr.logger)
+                # then stop the service process itself
+                mgr.stop_service(args.service)
             elif args.action == 'restart':
+                # Stop old daemon manager first
+                _stop_manager_daemon(LOGS_DIR / f'manager-{args.service}.pid', mgr.logger)
                 mgr.restart_service(args.service)
                 if args.daemon:
                     run_monitor_forever(mgr, f'service:{args.service}', LOGS_DIR / f'manager-{args.service}.pid')
@@ -732,21 +950,33 @@ def main():
 
         # Default: operate on all
         if args.action == 'start':
+            # Stop old global daemon manager if exists
+            _stop_manager_daemon(LOGS_DIR / 'manager-all.pid', mgr.logger)
             mgr.start_all()
             print(f"\nServices started. Check logs in: {LOGS_DIR}/")
-            # Start scheduled restart checker thread
-            _start_scheduled_restart_thread(mgr)
-            # Keep running to monitor services
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\nInterrupt received, stopping...")
-                mgr.stop_all()
+            if args.daemon:
+                run_monitor_forever(mgr, 'all', LOGS_DIR / 'manager-all.pid')
+            else:
+                # Keep running to monitor services (foreground mode)
+                try:
+                    _write_manager_pid(LOGS_DIR / 'manager-all.pid')
+                    _start_scheduled_restart_thread(mgr)
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    print("\nInterrupt received, stopping...")
+                    mgr.stop_all()
+                finally:
+                    _remove_manager_pid(LOGS_DIR / 'manager-all.pid')
         elif args.action == 'stop':
+            # Stop global daemon manager FIRST
+            _stop_manager_daemon(LOGS_DIR / 'manager-all.pid', mgr.logger)
             mgr.stop_all()
         elif args.action == 'restart':
+            _stop_manager_daemon(LOGS_DIR / 'manager-all.pid', mgr.logger)
             mgr.restart_all()
+            if args.daemon:
+                run_monitor_forever(mgr, 'all', LOGS_DIR / 'manager-all.pid')
     except Exception as e:
         import traceback
         tb = traceback.extract_tb(e.__traceback__)
