@@ -894,7 +894,7 @@ async def system_info(current_user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/process-tree")
-async def get_process_tree(
+def get_process_tree(
     service: str = Query(...),
     current_user: dict = Depends(get_current_user)
 ):

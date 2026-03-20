@@ -677,6 +677,18 @@ def build_process_tree(pid: int) -> Optional[Dict]:
             io = p.io_counters()
             info["read_bytes"] = getattr(io, "read_bytes", 0)
             info["write_bytes"] = getattr(io, "write_bytes", 0)
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            # io_counters may require elevated privileges on some systems;
+            # fall back to reading from /proc/<pid>/io directly
+            try:
+                with open(f"/proc/{p.pid}/io", "r") as f:
+                    for line in f:
+                        if line.startswith("read_bytes:"):
+                            info["read_bytes"] = int(line.split()[1])
+                        elif line.startswith("write_bytes:"):
+                            info["write_bytes"] = int(line.split()[1])
+            except Exception:
+                pass
         except Exception: pass
         try: info["num_threads"] = p.num_threads()
         except Exception: pass
@@ -690,14 +702,22 @@ def build_process_tree(pid: int) -> Optional[Dict]:
         except Exception: pass
         return info
 
+    # Phase 1: "prime" cpu_percent for all processes in the tree.
+    # The first call to cpu_percent(interval=None) on a new Process object
+    # always returns 0.0 — it only records a baseline.  We must call it
+    # once, wait, then call it again in _proc_info to get a real value.
+    all_procs = []
     try:
-        proc.cpu_percent(interval=None)
-        for c in proc.children(recursive=True):
-            try: c.cpu_percent(interval=None)
-            except Exception: pass
+        all_procs.append(proc)
+        all_procs.extend(proc.children(recursive=True))
     except Exception:
         pass
+    for p in all_procs:
+        try:
+            p.cpu_percent(interval=None)
+        except Exception:
+            pass
 
     import time
-    time.sleep(0.1)
+    time.sleep(0.5)
     return _proc_info(proc)
