@@ -646,40 +646,89 @@ def get_service_info(service_name: str) -> ServiceInfo:
 # ---------- Process tree detail ----------
 
 def build_process_tree(pid: int) -> Optional[Dict]:
+    import time
+
     try:
-        proc = psutil.Process(pid)
+        root = psutil.Process(pid)
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return None
 
-    def _proc_info(p):
+    # ------------------------------------------------------------------
+    # Phase 1 – collect ALL processes in the tree and "prime" cpu_percent.
+    # psutil.cpu_percent(interval=None) returns 0.0 on the FIRST call for
+    # a given Process object because it has no previous sample.  We must
+    # call it once, sleep, then call it AGAIN on the *same* objects.
+    # ------------------------------------------------------------------
+    all_procs: list[psutil.Process] = []
+    try:
+        all_procs.append(root)
+        all_procs.extend(root.children(recursive=True))
+    except Exception:
+        if not all_procs:
+            all_procs.append(root)
+
+    # First sample – just records a baseline (returns 0.0, ignored).
+    for p in all_procs:
+        try:
+            p.cpu_percent(interval=None)
+        except Exception:
+            pass
+
+    time.sleep(0.5)
+
+    # ------------------------------------------------------------------
+    # Phase 2 – collect actual metrics.  cpu_percent now returns real
+    # values because these are the *same* Process instances we primed.
+    # ------------------------------------------------------------------
+    # Build a {pid: Process} map so the tree builder can reuse primed objs.
+    proc_map: dict[int, psutil.Process] = {p.pid: p for p in all_procs}
+
+    def _collect(p: psutil.Process) -> Optional[Dict]:
         info = {
-            "pid": p.pid, "ppid": None, "name": "", "cmdline": "", "status": "",
-            "cpu_percent": 0.0, "memory_mb": 0.0, "memory_percent": 0.0,
-            "read_bytes": 0, "write_bytes": 0, "num_threads": 0, "create_time": None, "children": [],
+            "pid": p.pid, "ppid": None, "name": "", "cmdline": "",
+            "status": "", "cpu_percent": 0.0, "memory_mb": 0.0,
+            "memory_percent": 0.0, "read_bytes": 0, "write_bytes": 0,
+            "num_threads": 0, "create_time": None, "children": [],
         }
-        try: info["ppid"] = p.ppid()
-        except Exception: pass
-        try: info["name"] = p.name()
-        except Exception: pass
+        try:
+            info["ppid"] = p.ppid()
+        except Exception:
+            pass
+        try:
+            info["name"] = p.name()
+        except Exception:
+            pass
         try:
             cmdline = p.cmdline()
             info["cmdline"] = " ".join(cmdline) if cmdline else info["name"]
-        except Exception: info["cmdline"] = info["name"]
-        try: info["status"] = p.status()
-        except Exception: pass
-        try: info["cpu_percent"] = round(p.cpu_percent(interval=None), 2)
-        except Exception: pass
-        try: info["memory_mb"] = round(p.memory_info().rss / (1024 * 1024), 2)
-        except Exception: pass
-        try: info["memory_percent"] = round(p.memory_percent(), 2)
-        except Exception: pass
+        except Exception:
+            info["cmdline"] = info["name"]
+        try:
+            info["status"] = p.status()
+        except Exception:
+            pass
+
+        # CPU – second call on the same primed object → real value
+        try:
+            info["cpu_percent"] = round(p.cpu_percent(interval=None), 2)
+        except Exception:
+            pass
+
+        try:
+            info["memory_mb"] = round(p.memory_info().rss / (1024 * 1024), 2)
+        except Exception:
+            pass
+        try:
+            info["memory_percent"] = round(p.memory_percent(), 2)
+        except Exception:
+            pass
+
+        # IO counters
         try:
             io = p.io_counters()
             info["read_bytes"] = getattr(io, "read_bytes", 0)
             info["write_bytes"] = getattr(io, "write_bytes", 0)
         except (psutil.AccessDenied, psutil.NoSuchProcess):
-            # io_counters may require elevated privileges on some systems;
-            # fall back to reading from /proc/<pid>/io directly
             try:
                 with open(f"/proc/{p.pid}/io", "r") as f:
                     for line in f:
@@ -689,35 +738,27 @@ def build_process_tree(pid: int) -> Optional[Dict]:
                             info["write_bytes"] = int(line.split()[1])
             except Exception:
                 pass
-        except Exception: pass
-        try: info["num_threads"] = p.num_threads()
-        except Exception: pass
-        try: info["create_time"] = datetime.fromtimestamp(p.create_time()).isoformat()
-        except Exception: pass
-        try:
-            for child in p.children(recursive=False):
-                ci = _proc_info(child)
-                if ci:
-                    info["children"].append(ci)
-        except Exception: pass
-        return info
-
-    # Phase 1: "prime" cpu_percent for all processes in the tree.
-    # The first call to cpu_percent(interval=None) on a new Process object
-    # always returns 0.0 — it only records a baseline.  We must call it
-    # once, wait, then call it again in _proc_info to get a real value.
-    all_procs = []
-    try:
-        all_procs.append(proc)
-        all_procs.extend(proc.children(recursive=True))
-    except Exception:
-        pass
-    for p in all_procs:
-        try:
-            p.cpu_percent(interval=None)
         except Exception:
             pass
 
-    import time
-    time.sleep(0.5)
-    return _proc_info(proc)
+        try:
+            info["num_threads"] = p.num_threads()
+        except Exception:
+            pass
+        try:
+            info["create_time"] = datetime.fromtimestamp(p.create_time()).isoformat()
+        except Exception:
+            pass
+
+        # Recurse into children – reuse primed Process objects from proc_map
+        try:
+            for child in p.children(recursive=False):
+                primed_child = proc_map.get(child.pid, child)
+                ci = _collect(primed_child)
+                if ci:
+                    info["children"].append(ci)
+        except Exception:
+            pass
+        return info
+
+    return _collect(root)
