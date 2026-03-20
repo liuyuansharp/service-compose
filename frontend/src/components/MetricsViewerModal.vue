@@ -11,6 +11,10 @@
           {{ t('metrics') }} - {{ metricsService }} ({{ t('history') }})
         </h3>
         <div class="flex items-center gap-2">
+          <span class="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            {{ t('realtime') }}
+          </span>
           <select
             v-model.number="metricsRangeHours"
             class="px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded text-sm"

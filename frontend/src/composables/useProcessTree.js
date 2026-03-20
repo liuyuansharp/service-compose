@@ -1,16 +1,47 @@
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 
 export function useProcessTree({ authorizedFetch, showNotification, t }) {
   const showPidTree = ref(false)
   const pidTreeService = ref('')
   const pidTreeData = ref(null)
   const pidTreeLoading = ref(false)
+  let _pollTimer = null
+  const POLL_INTERVAL = 5000 // 5 seconds
+
+  const _startPolling = () => {
+    _stopPolling()
+    _pollTimer = setInterval(async () => {
+      if (!showPidTree.value || !pidTreeService.value) return
+      try {
+        const resp = await authorizedFetch(`/api/process-tree?service=${encodeURIComponent(pidTreeService.value)}`)
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+        pidTreeData.value = await resp.json()
+      } catch (e) {
+        // silent — don't clear existing data on poll failure
+      }
+    }, POLL_INTERVAL)
+  }
+
+  const _stopPolling = () => {
+    if (_pollTimer) {
+      clearInterval(_pollTimer)
+      _pollTimer = null
+    }
+  }
 
   const openPidTree = async (serviceName) => {
     pidTreeService.value = serviceName
     showPidTree.value = true
     pidTreeData.value = null
     await loadPidTree()
+    _startPolling()
+  }
+
+  const closePidTree = () => {
+    _stopPolling()
+    showPidTree.value = false
+    pidTreeService.value = ''
+    pidTreeData.value = null
   }
 
   const loadPidTree = async () => {
@@ -58,12 +89,17 @@ export function useProcessTree({ authorizedFetch, showNotification, t }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
+  onUnmounted(() => {
+    _stopPolling()
+  })
+
   return {
     showPidTree,
     pidTreeService,
     pidTreeData,
     pidTreeLoading,
     openPidTree,
+    closePidTree,
     loadPidTree,
     killPid,
     formatBytes,

@@ -202,6 +202,8 @@ export function useMetrics({
     }
   }
 
+  let _metricsUpdatePending = false
+
   const setupMetricsSSE = (service) => {
     if (!authToken?.value) return
     if (metricsEventSource) metricsEventSource.close()
@@ -219,6 +221,15 @@ export function useMetrics({
           history.push(point)
         }
         metricsHistory.value[service] = history
+
+        // Throttled chart update — avoid redrawing on every SSE message
+        if (!_metricsUpdatePending) {
+          _metricsUpdatePending = true
+          requestAnimationFrame(() => {
+            _metricsUpdatePending = false
+            void updateMetricsCharts()
+          })
+        }
       } catch (e) {}
     }
   }

@@ -284,7 +284,7 @@
       :kill-pid="killPid"
       :format-bytes="formatBytes"
       :format-audit-time="formatAuditTime"
-      :on-close="() => { showPidTree = false }"
+      :on-close="closePidTree"
     />
 
     <SystemInfoModal
@@ -656,6 +656,7 @@ const {
   pidTreeData,
   pidTreeLoading,
   openPidTree,
+  closePidTree,
   loadPidTree,
   killPid,
   formatBytes,

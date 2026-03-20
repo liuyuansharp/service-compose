@@ -20,6 +20,10 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <span class="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            {{ t('auto_refresh') }}
+          </span>
           <button @click="loadPidTree()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">{{ t('pid_tree_refresh') }}</button>
           <button @click="onClose()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1">
             <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>

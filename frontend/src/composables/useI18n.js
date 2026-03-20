@@ -338,6 +338,8 @@ const translations = {
     pid_tree_read: '读',
     pid_tree_write: '写',
     pid_tree_refresh: '刷新',
+    auto_refresh: '自动刷新',
+    realtime: '实时',
   },
   en: {
     login: 'Login',
@@ -682,6 +684,8 @@ const translations = {
     pid_tree_read: 'Read',
     pid_tree_write: 'Write',
     pid_tree_refresh: 'Refresh',
+    auto_refresh: 'Auto-refresh',
+    realtime: 'Realtime',
   }
 }
 
