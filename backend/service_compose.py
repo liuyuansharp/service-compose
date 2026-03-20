@@ -145,6 +145,7 @@ class ServiceProcess:
         self.args = args or []
         self.log_file = LOGS_DIR / f'{name}.log'
         self.pidfile = LOGS_DIR / f'{name}.pid'
+        self.stopflag = LOGS_DIR / f'{name}.stop'   # cross-process stop signal
         self.restart_on_exit = restart_on_exit
         self.process = None
         self._stop_requested = threading.Event()
@@ -205,6 +206,29 @@ class ServiceProcess:
                 self.logger.debug(f"Removed pidfile {self.pidfile}")
         except Exception as e:
             self.logger.error(f"Failed to remove pidfile: {e}")
+
+    def _write_stop_flag(self):
+        """Write stop flag file to signal watcher threads (including in other
+        daemon processes) that this service should NOT be auto-restarted."""
+        try:
+            self.stopflag.parent.mkdir(parents=True, exist_ok=True)
+            self.stopflag.write_text(str(time.time()))
+            self.logger.debug(f"Wrote stop flag {self.stopflag}")
+        except Exception as e:
+            self.logger.error(f"Failed to write stop flag: {e}")
+
+    def _remove_stop_flag(self):
+        """Remove stop flag file (called before start)."""
+        try:
+            if self.stopflag.exists():
+                self.stopflag.unlink()
+                self.logger.debug(f"Removed stop flag {self.stopflag}")
+        except Exception as e:
+            self.logger.error(f"Failed to remove stop flag: {e}")
+
+    def _is_stop_flagged(self):
+        """Check if stop flag exists (another process requested stop)."""
+        return self.stopflag.exists()
 
     def _read_pid_from_file(self):
         """Read PID from pidfile. Returns int or None."""
@@ -352,12 +376,29 @@ class ServiceProcess:
         self.logger.info(f"Process tree (root {pid}) fully killed")
         return True
 
-    def start(self):
-        """Start the service process."""
+    def start(self, _from_watcher=False):
+        """Start the service process.
+
+        Args:
+            _from_watcher: Internal flag. When True (called by _watch for
+                auto-restart), do NOT clear the stop flag file so that a
+                concurrent stop command is respected.
+        """
         with self._lock:
             if self.process and self.process.poll() is None:
                 self.logger.info(f"Already running (pid={self.process.pid})")
                 return
+
+            if not _from_watcher:
+                # External / explicit start — clear stop flag
+                self._remove_stop_flag()
+            else:
+                # Auto-restart from watcher — recheck flag under lock
+                if self._is_stop_flagged():
+                    self.logger.info(
+                        "Stop flag detected inside start() (from watcher), aborting"
+                    )
+                    return
 
             # Check for residual process from pidfile (e.g. from a previous manager instance)
             old_pid = self._read_pid_from_file()
@@ -403,6 +444,10 @@ class ServiceProcess:
         """Stop the service process gracefully."""
         with self._lock:
             self._stop_requested.set()
+
+            # Write stop flag FIRST — this signals any daemon watcher thread
+            # (including those in other processes) to NOT auto-restart
+            self._write_stop_flag()
             
             if not self.process:
                 # No in-memory process handle — try to recover PID from pidfile
@@ -467,6 +512,16 @@ class ServiceProcess:
             self.logger.warning(f"Process exited with code {ret}")
             self._remove_pidfile()
             
+            # Check cross-process stop flag BEFORE deciding to restart.
+            # Another process (e.g. a stop command from the Web UI) may have
+            # written this flag to tell us not to restart.
+            if self._is_stop_flagged():
+                self.logger.info(
+                    "Stop flag detected — service was stopped intentionally, "
+                    "skipping auto-restart"
+                )
+                break
+            
             if self.restart_on_exit and not self._stop_requested.is_set():
                 # Check for restart storm
                 if self._check_restart_storm():
@@ -483,9 +538,16 @@ class ServiceProcess:
                 )
                 time.sleep(delay)
                 
+                # Re-check stop flag after delay (stop may have arrived during wait)
+                if self._is_stop_flagged() or self._stop_requested.is_set():
+                    self.logger.info(
+                        "Stop flag/request detected after delay, aborting restart"
+                    )
+                    break
+                
                 try:
                     self.logger.info("Attempting to restart...")
-                    self.start()
+                    self.start(_from_watcher=True)
                 except Exception as e:
                     self.logger.error(f"Failed to restart: {e}")
             break

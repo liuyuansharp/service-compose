@@ -46,7 +46,8 @@ def _save_file(path: Path, data: dict):
 
 
 LOGS_DIR = RUN_DIR / 'logs'
-AUTH_DB_PATH = RUN_DIR / 'auth.db'
+_auth_db_env = os.getenv('AUTH_DB_PATH', '')
+AUTH_DB_PATH = Path(_auth_db_env) if _auth_db_env else RUN_DIR / 'auth.db'
 AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
 SYSTEM_METRICS_FILE = LOGS_DIR / 'system_metrics_history.json'
 
@@ -113,7 +114,8 @@ def update_run_dir(services_conifg_path):
             RUN_DIR = Path(resolved_run_dir)
             CONFIG_FILE = Path(services_conifg_path)
             LOGS_DIR = RUN_DIR / 'logs'
-            AUTH_DB_PATH = RUN_DIR / 'auth.db'
+            if not _auth_db_env:
+                AUTH_DB_PATH = RUN_DIR / 'auth.db'
             AUDIT_LOG_FILE = LOGS_DIR / 'audit.json'
             SYSTEM_METRICS_FILE = LOGS_DIR / 'system_metrics_history.json'
             LOGS_DIR.mkdir(exist_ok=True)
